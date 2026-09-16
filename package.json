@@ -19,6 +19,7 @@
     "watch:status": "node bin/watch-status.cjs",
     "watch:check": "wscript //B //NOLOGO bin/watchdog.vbs --once",
     "selftest": "node test/selftest.cjs",
+    "check:feishu": "node bin/check-feishu.cjs",
     "deploy:github": "node bin/deploy-github.cjs"
   },
   "dependencies": {

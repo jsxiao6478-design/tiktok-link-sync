@@ -194,6 +194,22 @@ function loadCliAppId() {
   }
 }
 
+/**
+ * 本机 config.json 里的云端机器人凭证（feishu.cloud）。
+ * 该文件已被 .gitignore 排除，凭证不会进仓库。
+ * 有值时就不必再让用户手工粘贴，少一步交互。
+ */
+function loadCloudCreds() {
+  try {
+    const p = path.join(__dirname, '..', 'config.json');
+    const c = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const cloud = (c.feishu && c.feishu.cloud) || {};
+    return { appId: cloud.appId || '', appSecret: cloud.appSecret || '' };
+  } catch (_) {
+    return { appId: '', appSecret: '' };
+  }
+}
+
 // ────────────────────────────────────────────────────────────
 // gh CLI
 // ────────────────────────────────────────────────────────────
@@ -366,9 +382,16 @@ async function main() {
   // ── 2. 收集凭证 ─────────────────────────────────────────
   step(2, TOTAL, '收集凭证');
 
-  let appId = process.env.DEPLOY_FEISHU_APP_ID || loadCliAppId();
+  const cloudCreds = loadCloudCreds();
+
+  let appId = process.env.DEPLOY_FEISHU_APP_ID || cloudCreds.appId || loadCliAppId();
   if (appId) {
-    ok(`飞书 App ID：${appId}${process.env.DEPLOY_FEISHU_APP_ID ? '（来自环境变量）' : '（自动读取）'}`);
+    const src = process.env.DEPLOY_FEISHU_APP_ID
+      ? '来自环境变量'
+      : cloudCreds.appId
+        ? '来自 config.json'
+        : '自动读取';
+    ok(`飞书 App ID：${appId}（${src}）`);
   } else {
     warn('没能自动读到飞书 App ID');
     appId = await ask('  请粘贴飞书 App ID（cli_ 开头）：');
@@ -378,9 +401,9 @@ async function main() {
     }
   }
 
-  let appSecret = process.env.DEPLOY_FEISHU_SECRET || '';
+  let appSecret = process.env.DEPLOY_FEISHU_SECRET || cloudCreds.appSecret || '';
   if (appSecret) {
-    ok('飞书 App Secret：已从环境变量读取');
+    ok(`飞书 App Secret：已读取（${process.env.DEPLOY_FEISHU_SECRET ? '环境变量' : 'config.json'}，免粘贴）`);
   } else {
     log('');
     log('  ' + bold('去飞书开放平台拿 App Secret：'));

@@ -152,13 +152,17 @@ function tick() {
 async function main() {
   const args = parseArgs(process.argv);
   const interval = Math.max(5, Number(args.interval || process.env.WATCH_INTERVAL_SEC || 60));
-  statsEvery = Number(args['stats-every'] || process.env.STATS_EVERY_ROUNDS || 30);
+  // 显式解析：STATS_EVERY_ROUNDS=0 表示「本机不刷 stats」。
+  // 上云之后用这个开关，把 stats 交给 GitHub Actions，本机只保留按钮的快速响应。
+  const rawEvery = args['stats-every'] ?? process.env.STATS_EVERY_ROUNDS;
+  const parsedEvery = rawEvery === undefined || rawEvery === '' ? 30 : Number(rawEvery);
+  statsEvery = Number.isFinite(parsedEvery) && parsedEvery >= 0 ? parsedEvery : 30;
 
   registerSelf();
-  log(
-    `守护进程已启动 PID=${process.pid}，每 ${interval}s 跑一次 sync.cjs` +
-      `（每 ${statsEvery} 轮≈${Math.round((interval * statsEvery) / 60)} 分钟刷一次播放量/点赞数，Ctrl+C 退出）`
-  );
+  const statsNote = statsEvery > 0
+    ? `，每 ${statsEvery} 轮≈${Math.round((interval * statsEvery) / 60)} 分钟刷一次播放量/点赞数`
+    : '，本机不刷播放量/点赞数（交给云端）';
+  log(`守护进程已启动 PID=${process.pid}，每 ${interval}s 跑一次 sync.cjs${statsNote}，Ctrl+C 退出`);
   beat();
 
   let stopping = false;

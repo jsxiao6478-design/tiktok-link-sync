@@ -144,7 +144,22 @@ npm run watch:stop     # 写 data/watch.disabled，看门狗不会再自动拉�
 
 之后「立即同步」按钮的响应时间从 ≤60 秒变成 ≤30 分钟（等云端下一轮），但换来的是完全不受本机开关机影响。
 
-**如果你想两者都要**（按钮 60 秒响应 + 关机也能跑）：保留本机守护进程，但把本机的播放量刷新频率调低，避免和云端撞车 —— 找我把本机的 stats 刷新轮次调大或关掉即可。
+**如果你想两者都要**（按钮 60 秒响应 + 关机也能跑）：保留本机守护进程，但让它**只补链接、不刷播放量/点赞数**，避免和云端重复抓取：
+
+```bash
+npm run watch:stop
+npm run watch:start -- --stats-every 0     # 0 = 本机不刷 stats，交给云端
+```
+
+或者只是把本机的刷新间隔拉长（例如 120 轮 ≈ 2 小时）：
+
+```bash
+npm run watch:stop
+npm run watch:start -- --stats-every 120
+```
+
+> 后台启动的守护进程会继承这条命令的环境变量，参数也支持 `--interval` 等。
+> 想让它长期生效，也可以直接改 `src/watch-trigger.cjs` 里的默认值（`let statsEvery = 30`）。
 
 ---
 

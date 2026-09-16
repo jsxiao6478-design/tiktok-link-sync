@@ -4,6 +4,10 @@
  * Windows 上没有 nohup，用 detached spawn 让父进程退出但子进程继续。
  * 关闭终端不会影响它；要看日志请用 `npm run watch:log`。
  *
+ * 命令行参数会原样转发给守护进程，例如：
+ *   npm run watch:start -- --stats-every 0     # 本机不刷播放量/点赞数（交给云端）
+ *   npm run watch:start -- --interval 30       # 改成每 30 秒一轮
+ *
  * 相关文件：
  *   data/watch.pid         守护进程 PID
  *   data/watch.heartbeat   守护进程心跳（每轮 sync 前后刷新，看门狗据此判断存活）
@@ -62,7 +66,7 @@ try { fs.unlinkSync(HEARTBEAT); } catch (_) { /* ignore */ }
 const out = fs.openSync(LOG, 'a');
 const err = fs.openSync(LOG, 'a');
 
-const child = spawn(process.execPath, [ENTRY], {
+const child = spawn(process.execPath, [ENTRY, ...process.argv.slice(2)], {
   cwd: ROOT,
   detached: true,
   stdio: ['ignore', out, err],

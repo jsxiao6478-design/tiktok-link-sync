@@ -1,0 +1,7 @@
+# 统一换行符，避免 Windows 上编辑后推到 Linux runner 出问题
+* text=auto eol=lf
+
+# Windows 专用脚本保持 CRLF
+*.bat text eol=crlf
+*.vbs text eol=crlf
+*.cmd text eol=crlf

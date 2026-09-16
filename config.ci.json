@@ -1,0 +1,39 @@
+{
+  "_说明": "GitHub Actions（云端）专用配置：不含任何凭证与表格坐标，baseToken / tableId / app 凭证全部从仓库 Secrets 注入。本机运行请用 config.json。",
+
+  "headless": true,
+  "timezone": "Asia/Shanghai",
+  "locale": "es-MX",
+  "maxScroll": 6,
+  "scrollDelayMs": 2500,
+  "firstWaitMs": 7000,
+  "matchThreshold": 0.45,
+
+  "columns": {
+    "account": "账号",
+    "title": "标题",
+    "date": "发布日期",
+    "link": "视频链接"
+  },
+
+  "feishu": {
+    "fields": {
+      "account": "TikTok账号",
+      "title": "视频标题",
+      "date": "发布日期",
+      "link": "TikTok链接",
+      "status": "状态",
+      "matchedTitle": "匹配到的标题",
+      "hint": "提示",
+      "trigger": "同步触发",
+      "plays": "播放量",
+      "likes": "点赞数"
+    },
+    "statusOptions": {
+      "pending": "待补全",
+      "done": "已补全",
+      "review": "需人工确认",
+      "notFound": "未找到"
+    }
+  }
+}

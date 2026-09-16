@@ -1,0 +1,93 @@
+name: TikTok 表格同步
+
+# 每 30 分钟同步一次飞书多维表格：
+#   1) 补齐还没填链接的行（标题+日期匹配）
+#   2) 刷新已有链接行的播放量 / 点赞数
+# 全程在 GitHub 云端运行，与你自己的电脑开不开机无关。
+
+on:
+  schedule:
+    # GitHub 的 cron 用 UTC。整半小时在任何时区都对齐，所以不用换算。
+    # 注意：平台高峰期可能延迟几分钟到十几分钟，属正常现象。
+    - cron: '0,30 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '运行模式：sync=正常同步；smoke-only=只做连通性测试不写表'
+        type: choice
+        default: sync
+        options:
+          - sync
+          - smoke-only
+
+concurrency:
+  group: tiktok-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      TZ: Asia/Shanghai
+      # 凭证全部从仓库 Secrets 注入（Settings → Secrets and variables → Actions）
+      # 没配置的 Secret 会是空字符串，代码会自动忽略并退回 lark-cli 后端
+      FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+      FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+      FEISHU_BASE_TOKEN: ${{ secrets.FEISHU_BASE_TOKEN }}
+      FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+      # 可选：抓取用代理。GitHub runner 直连 TikTok 若被拦，在这里填一个公网代理
+      TIKTOK_PROXY: ${{ secrets.TIKTOK_PROXY }}
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 缓存浏览器
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: 安装浏览器
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        # 版本必须与 playwright-core 完全一致，否则找不到对应的浏览器 revision，
+        # 所以这里从 node_modules 里动态取版本，而不是写死。
+        run: |
+          PW_VERSION=$(node -p "require('playwright-core/package.json').version")
+          echo "playwright-core 版本: $PW_VERSION"
+          npx --yes "playwright@$PW_VERSION" install --with-deps chromium
+
+      # ── 以下两步会写飞书表格 ────────────────────────────────
+      # 用 config.ci.json（不含凭证），表格坐标与 app 凭证全部来自上面的 Secrets
+      - name: 烟雾测试
+        if: github.event.inputs.mode == 'smoke-only'
+        run: node bin/smoke-test.cjs --config config.ci.json
+
+      - name: 同步（补齐缺失的视频链接）
+        if: github.event_name == 'schedule' || github.event.inputs.mode == 'sync'
+        run: node src/sync.cjs --source feishu --config config.ci.json
+
+      - name: 同步（刷新播放量 / 点赞数）
+        if: github.event_name == 'schedule' || github.event.inputs.mode == 'sync'
+        run: node src/sync.cjs --source feishu --config config.ci.json --refresh-stats
+
+      - name: 保留运行日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-${{ github.run_number }}
+          path: data/feishu-run-*.csv
+          if-no-files-found: ignore
+          retention-days: 7

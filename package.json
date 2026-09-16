@@ -1,0 +1,23 @@
+{
+  "name": "tiktok-link-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "按账号+标题+发布日期，自动补全 TikTok 视频链接",
+  "main": "src/sync.cjs",
+  "scripts": {
+    "sync": "node src/sync.cjs",
+    "sync:once": "node src/sync.cjs --source feishu",
+    "sync:retry": "node src/sync.cjs --source feishu --retry",
+    "sync:force": "node src/sync.cjs --source feishu --force",
+    "watch": "node src/watch-trigger.cjs",
+    "watch:start": "node bin/start-watch.cjs",
+    "watch:stop": "node bin/stop-watch.cjs",
+    "watch:restart": "node bin/stop-watch.cjs && node bin/start-watch.cjs",
+    "watch:status": "node bin/watch-status.cjs",
+    "watch:check": "wscript //B //NOLOGO bin/watchdog.vbs --once",
+    "selftest": "node test/selftest.cjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.56.0"
+  }
+}

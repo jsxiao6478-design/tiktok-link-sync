@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '运行模式：sync=正常同步；smoke-only=连通性测试；diag-sources=数据源探测第一轮；diag-sources2=第二轮'
+        description: 'sync=正常同步；smoke-only=连通性测试；diag-sources/2=数据源探测；diag-embed=嵌入页结构深挖'
         type: choice
         default: sync
         options:
@@ -25,6 +25,7 @@ on:
           - smoke-only
           - diag-sources
           - diag-sources2
+          - diag-embed
 
 concurrency:
   group: tiktok-sync
@@ -67,6 +68,10 @@ jobs:
       - name: 探测可用数据源（第二轮：列表通道专项）
         if: github.event.inputs.mode == 'diag-sources2'
         run: node bin/diag-sources2.cjs
+
+      - name: 嵌入页结构深挖（需要浏览器）
+        if: github.event.inputs.mode == 'diag-embed'
+        run: node bin/diag-embed.cjs
 
       - name: 安装依赖
         run: npm ci

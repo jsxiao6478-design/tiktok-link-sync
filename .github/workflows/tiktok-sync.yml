@@ -17,12 +17,13 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '运行模式：sync=正常同步；smoke-only=只做连通性测试不写表'
+        description: '运行模式：sync=正常同步；smoke-only=只做连通性测试不写表；diag-sources=探测可用的数据源'
         type: choice
         default: sync
         options:
           - sync
           - smoke-only
+          - diag-sources
 
 concurrency:
   group: tiktok-sync
@@ -56,6 +57,11 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+
+      # ── 数据源探测（纯 HTTP，不需要浏览器，故意放在装依赖之前以便快速出结果）──
+      - name: 探测可用数据源
+        if: github.event.inputs.mode == 'diag-sources'
+        run: node bin/diag-sources.cjs
 
       - name: 安装依赖
         run: npm ci

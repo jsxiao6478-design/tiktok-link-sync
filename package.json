@@ -18,7 +18,8 @@
     "watch:restart": "node bin/stop-watch.cjs && node bin/start-watch.cjs",
     "watch:status": "node bin/watch-status.cjs",
     "watch:check": "wscript //B //NOLOGO bin/watchdog.vbs --once",
-    "selftest": "node test/selftest.cjs"
+    "selftest": "node test/selftest.cjs",
+    "deploy:github": "node bin/deploy-github.cjs"
   },
   "dependencies": {
     "playwright-core": "^1.56.0"

@@ -438,7 +438,7 @@ async function main() {
     dirty.stdout.split('\n').slice(0, 8).forEach((l) => info(l));
     if (!(await confirm('  继续？', true))) process.exit(0);
     run('git', ['add', '-A']);
-    const c = run('git', ['commit', '-m', '部署前自动提交']);
+    const c = run('git', ['commit', '-m', 'chore: 部署前提交本机未提交的改动']);
     if (c.status === 0) ok('已自动提交');
   } else {
     ok('工作区干净');

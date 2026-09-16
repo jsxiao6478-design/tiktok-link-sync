@@ -76,7 +76,10 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      # 抓取通道：没配 TIKTOK_PROXY 时走纯 HTTP（嵌入页 + 视频页），完全不需要浏览器，
+      # 也就省掉装 chromium 的 2~3 分钟；配了代理才用浏览器（能翻到更多历史作品）。
       - name: 缓存浏览器
+        if: env.TIKTOK_PROXY != ''
         id: pw-cache
         uses: actions/cache@v4
         with:
@@ -84,7 +87,7 @@ jobs:
           key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: 安装浏览器
-        if: steps.pw-cache.outputs.cache-hit != 'true'
+        if: env.TIKTOK_PROXY != '' && steps.pw-cache.outputs.cache-hit != 'true'
         # 版本必须与 playwright-core 完全一致，否则找不到对应的浏览器 revision，
         # 所以这里从 node_modules 里动态取版本，而不是写死。
         run: |

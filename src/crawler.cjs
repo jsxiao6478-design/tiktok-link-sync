@@ -1,12 +1,24 @@
 /**
  * TikTok 抓取引擎
  *
- * 思路: 不解析 DOM, 而是拦截 TikTok 自己发出的 /api/post/item_list/ 响应,
- * 直接读取结构化字段 (id / desc / createTime), 由 id 拼出规范视频链接。
- * DOM 卡片仅作兜底。
+ * 两条通道，按环境自动选择：
+ *
+ *   browser —— 打开主页，拦截 TikTok 自己发的 /api/post/item_list/ 响应。
+ *              数据最全（能翻到几十条历史），但依赖出口 IP 不被降级。
+ *              中国大陆需要代理；GitHub 机房 IP 会被稳定降级，云端不可用。
+ *
+ *   http    —— 纯 HTTP 走官方 SSR：嵌入页拿最近 10 条，再逐个视频页补
+ *              发布时间与点赞数。不吃 IP 信誉，云端默认走这条。
+ *              代价：只能覆盖每个账号最近 10 条作品。
+ *
+ * 选择规则（resolveCrawlMode）：
+ *   config.crawlMode = 'http' | 'browser' | 'auto'
+ *   或环境变量 TIKTOK_CRAWL_MODE
+ *   'auto'（默认）：配了代理 → 浏览器优先、失败回落 HTTP；没配代理 → 只用 HTTP
  */
 const { chromium } = require('playwright-core');
 const fs = require('fs');
+const { fetchAccountVideosHttp, localDate } = require('./tiktok-http.cjs');
 
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36';
@@ -34,18 +46,7 @@ async function launchBrowser(config = {}) {
   return chromium.launch(launchOpts);
 }
 
-function localDate(ts, timeZone) {
-  try {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: timeZone || 'Asia/Shanghai',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date(ts * 1000));
-  } catch {
-    return new Date(ts * 1000).toISOString().slice(0, 10);
-  }
-}
+// localDate 由 tiktok-http.cjs 提供（两条通道共用同一个时区格式化）
 
 function mapItems(rawList, fallbackUsername, timeZone) {
   return rawList.map((it) => {
@@ -65,10 +66,10 @@ function mapItems(rawList, fallbackUsername, timeZone) {
 }
 
 /**
- * 抓取单个账号的近期视频
+ * 【浏览器通道】打开账号主页，拦截 /api/post/item_list/ 响应抓取
  * @returns {Promise<{username, videos, degraded, error}>}
  */
-async function fetchAccountVideos(browser, username, config = {}) {
+async function fetchAccountVideosBrowser(browser, username, config = {}) {
   const uname = String(username).replace(/^@/, '').replace(/\/$/, '');
   const timeZone = config.timezone || 'Asia/Shanghai';
   const maxScroll = config.maxScroll ?? 6;
@@ -166,4 +167,79 @@ function dedupeById(items) {
   return out;
 }
 
-module.exports = { launchBrowser, fetchAccountVideos, USER_AGENT };
+/**
+ * 决定用哪条通道
+ *   'http'    —— 只用纯 HTTP（云端默认）
+ *   'browser' —— 只用浏览器
+ *   'auto'    —— 配了代理：浏览器优先、失败回落 HTTP
+ */
+function resolveCrawlMode(config = {}) {
+  const explicit = String(config.crawlMode || process.env.TIKTOK_CRAWL_MODE || '').toLowerCase();
+  if (explicit === 'http' || explicit === 'browser') return explicit;
+  const proxy = process.env.TIKTOK_PROXY || config.proxy;
+  return proxy ? 'auto' : 'http';
+}
+
+/** 两条通道的结果按视频 ID 合并，浏览器数据优先（字段更全） */
+function mergeVideoResults(primary, fallback) {
+  const byId = new Map();
+  for (const v of (fallback && fallback.videos) || []) byId.set(v.id, v);
+  for (const v of (primary && primary.videos) || []) {
+    const prev = byId.get(v.id) || {};
+    byId.set(v.id, { ...prev, ...v });
+  }
+  const videos = [...byId.values()];
+  const ok = (r) => (r && r.videos && r.videos.length ? r : null);
+  const winner = ok(primary) || ok(fallback) || null;
+  return {
+    username: (primary && primary.username) || (fallback && fallback.username),
+    videos,
+    degraded: videos.length === 0,
+    error: winner ? null : (primary && primary.error) || (fallback && fallback.error) || null,
+    source: [fallback && fallback.source, primary && primary.source]
+      .filter(Boolean)
+      .concat(!(primary && primary.source) && !(fallback && fallback.source) ? ['browser'] : [])
+      .join('+'),
+  };
+}
+
+/**
+ * 抓取单个账号的近期视频（对外统一入口，自动选通道）
+ * @returns {Promise<{username, videos, degraded, error, source}>}
+ */
+async function fetchAccountVideos(browser, username, config = {}) {
+  const mode = resolveCrawlMode(config);
+
+  if (mode === 'http') {
+    try {
+      return await fetchAccountVideosHttp(username, config);
+    } catch (e) {
+      return { username, videos: [], degraded: true, error: e.message, source: 'http-embed' };
+    }
+  }
+
+  if (mode === 'browser') {
+    return fetchAccountVideosBrowser(browser, username, config);
+  }
+
+  // auto：浏览器优先（历史更全），拿不到再用 HTTP 兜底（至少给最近 10 条）
+  const br = await fetchAccountVideosBrowser(browser, username, config);
+  if (br.videos && br.videos.length) return { ...br, source: 'browser' };
+  const httpRes = await fetchAccountVideosHttp(username, config).catch((e) => ({
+    username,
+    videos: [],
+    degraded: true,
+    error: e.message,
+    source: 'http-embed',
+  }));
+  return mergeVideoResults(httpRes, br);
+}
+
+module.exports = {
+  launchBrowser,
+  fetchAccountVideos,
+  fetchAccountVideosBrowser,
+  fetchAccountVideosHttp,
+  resolveCrawlMode,
+  USER_AGENT,
+};

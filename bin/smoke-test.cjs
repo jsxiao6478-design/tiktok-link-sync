@@ -21,7 +21,7 @@ const os = require('os');
 const { execFileSync } = require('child_process');
 const { loadConfig, ROOT } = require('../src/config.cjs');
 const feishu = require('../src/feishu.cjs');
-const { launchBrowser, fetchAccountVideos } = require('../src/crawler.cjs');
+const { launchBrowser, fetchAccountVideos, resolveCrawlMode } = require('../src/crawler.cjs');
 
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36';
@@ -168,19 +168,25 @@ async function main() {
     if (!uname) {
       warn('拿不到可试抓的账号（表里没读到账号），跳过抓取测试');
     } else {
-      info(`开始试抓 @${uname} ...`);
+      const mode = resolveCrawlMode(config);
+      info(`开始试抓 @${uname} ...（通道：${mode === 'http' ? '纯 HTTP（嵌入页 + 视频页）' : '浏览器'}）`);
       let browser = null;
       try {
-        browser = await launchBrowser(config);
-        ok('浏览器启动成功');
+        if (mode !== 'http') {
+          browser = await launchBrowser(config);
+          ok('浏览器启动成功');
+        }
         const started = Date.now();
-        const { videos, degraded, error } = await fetchAccountVideos(browser, uname, config);
+        const { videos, degraded, error, source } = await fetchAccountVideos(browser, uname, config);
         const secs = Math.round((Date.now() - started) / 1000);
         if (videos.length > 0) {
-          ok(`抓取 @${uname} 成功：${videos.length} 条视频，耗时 ${secs}s`);
+          ok(`抓取 @${uname} 成功：${videos.length} 条视频，耗时 ${secs}s（通道 ${source || mode}）`);
           const v = videos[0];
-          info(`  最新一条: ${String(v.title).slice(0, 40)} | plays=${v.plays} likes=${v.likes}`);
-          info(`  单次运行预计耗时：约 ${secs * 2 + 30}s（两个账号 + 启动开销）`);
+          info(`  最新一条: [${v.createDate}] ${String(v.title).slice(0, 40)} | plays=${v.plays} likes=${v.likes}`);
+          info(`  单次运行预计耗时：约 ${secs * 2 + 15}s（两个账号 + 启动开销）`);
+          if (mode === 'http') {
+            warn('纯 HTTP 通道只覆盖每个账号「最近 10 条」——更早的旧行需要本地守护进程补位');
+          }
         } else {
           bad(`抓取 @${uname} 返回 0 条${degraded ? '（被降级 / 风控 / 无公开视频）' : ''} ${error || ''}`);
           info('  → 这台机器的出口 IP 被 TikTok 拦了。可尝试给 TIKTOK_PROXY 配一个可用的境外出口。');

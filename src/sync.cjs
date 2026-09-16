@@ -20,7 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const { readCsv, writeCsv } = require('./csv.cjs');
-const { launchBrowser, fetchAccountVideos } = require('./crawler.cjs');
+const { launchBrowser, fetchAccountVideos, resolveCrawlMode } = require('./crawler.cjs');
 const { matchRecords, normalizeAccount, parseDate } = require('./matcher.cjs');
 const feishu = require('./feishu.cjs');
 const { loadConfig } = require('./config.cjs');
@@ -278,7 +278,9 @@ async function crawlAccounts(accounts, config, args) {
   const needFetch = accounts.some((acc) => !(useCache && fs.existsSync(cacheFileOf(acc))));
 
   let browser = null;
-  if (needFetch) browser = await launchBrowser(config);
+  const crawlMode = resolveCrawlMode(config);
+  if (needFetch && crawlMode !== 'http') browser = await launchBrowser(config);
+  else if (crawlMode === 'http') log('抓取通道：纯 HTTP（嵌入页 + 视频页），不启动浏览器');
   else log('全部账号命中本地缓存，跳过浏览器启动');
 
   try {

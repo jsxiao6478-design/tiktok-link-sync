@@ -21,6 +21,7 @@ const fs = require('fs');
 const path = require('path');
 const { readCsv, writeCsv } = require('./csv.cjs');
 const { launchBrowser, fetchAccountVideos, resolveCrawlMode } = require('./crawler.cjs');
+const { fetchVideoStatsHttp } = require('./tiktok-http.cjs');
 const { matchRecords, normalizeAccount, parseDate } = require('./matcher.cjs');
 const feishu = require('./feishu.cjs');
 const { loadConfig } = require('./config.cjs');
@@ -544,10 +545,22 @@ async function runFeishu(args, config) {
     return;
   }
 
-  const accounts = [...new Set(pending.map((r) => normalizeAccount(r.account)))].filter(Boolean);
-  log(`涉及账号 ${accounts.length} 个: ${accounts.join(', ')}`);
+  const cacheDir = path.resolve(ROOT, 'data/cache');
+  let videosByAccount = {};
+  let degradedAccounts = new Set();
 
-  const { videosByAccount, cacheDir, degradedAccounts } = await crawlAccounts(accounts, config, args);
+  if (refreshStats) {
+    // stats 刷新不再抓账号列表：嵌入页只覆盖「最近 10 条」，
+    // 表格覆盖 3 天（每账号最多 30+ 条），靠账号级抓取永远刷不满。
+    // 改为按每行链接里的视频 ID 直连视频页 SSR（fetchVideoStatsHttp），
+    // 逐行精确刷新，覆盖所有已有链接的行，包括最早的。
+    const accounts = [...new Set(pending.map((r) => normalizeAccount(r.account)))].filter(Boolean);
+    log(`涉及账号 ${accounts.length} 个（stats 模式：按视频 ID 逐行直连视频页，不抓账号列表）`);
+  } else {
+    const accounts = [...new Set(pending.map((r) => normalizeAccount(r.account)))].filter(Boolean);
+    log(`涉及账号 ${accounts.length} 个: ${accounts.join(', ')}`);
+    ({ videosByAccount, degradedAccounts } = await crawlAccounts(accounts, config, args));
+  }
 
   // 组装写回内容
   const updates = [];
@@ -555,21 +568,29 @@ async function runFeishu(args, config) {
   let results = [];
 
   if (refreshStats) {
-    // ── stats 刷新：按「行里已有链接的视频 ID」精确查表 ──
+    // ── stats 刷新：按「行里已有链接的视频 ID」直接访问视频页 SSR ──
     // 刻意不用标题模糊匹配：文案相近 / 二次发布时标题匹配可能把 A 视频的
     // 播放量写到 B 行上；video ID 唯一，不存在歧义。
-    const videoIndex = new Map();
-    for (const vids of Object.values(videosByAccount)) {
-      for (const v of vids || []) if (v && v.id) videoIndex.set(String(v.id), v);
-    }
-    log(`抓取结果合计 ${videoIndex.size} 条视频，按视频 ID 精确匹配`);
-
+    // 也不依赖账号级抓取（嵌入页只有最近 10 条，更早的行永远刷不到）。
+    const delay = Math.max(0, Number(config.httpDelayMs ?? 400));
     let hit = 0;
-    for (const rec of pending) {
-      const id = (String(rec.link || '').match(/([0-9]{19})/) || [])[1];
-      const v = id ? videoIndex.get(id) : null;
-      const playsNum = v ? Number(v.plays) : NaN;
-      const likesNum = v ? Number(v.likes) : NaN;
+    const miss = [];
+    for (let i = 0; i < pending.length; i++) {
+      const rec = pending[i];
+      const id = (String(rec.link || '').match(/\/video\/([0-9]{10,25})/) || [])[1];
+      const uname = normalizeAccount(rec.account);
+      let playsNum = NaN;
+      let likesNum = NaN;
+
+      if (id && uname) {
+        try {
+          const d = await fetchVideoStatsHttp(uname, id, config);
+          if (typeof d.plays === 'number') playsNum = d.plays;
+          if (typeof d.likes === 'number') likesNum = d.likes;
+        } catch (e) {
+          miss.push(`@${uname}/${id}: ${e.message}`);
+        }
+      }
 
       // 只刷 stats：不动 link / 状态 / 匹配标题 / 置信度 / TRIGGER
       const fields = {};
@@ -589,8 +610,16 @@ async function runFeishu(args, config) {
         播放量: Number.isFinite(playsNum) ? playsNum : '',
         点赞数: Number.isFinite(likesNum) ? likesNum : '',
       });
+
+      if ((i + 1) % 10 === 0) log(`  …已处理 ${i + 1}/${pending.length} 行（命中 ${hit}）`);
+      if (i < pending.length - 1 && delay) await new Promise((r) => setTimeout(r, delay));
     }
-    log(`精确命中 ${hit}/${pending.length} 条（未命中的行保持原值，不会被清空）`);
+    log(`直连命中 ${hit}/${pending.length} 条（未命中的行保持原值，不会被清空）`);
+    if (miss.length) {
+      log(`  ✗ ${miss.length} 条抓取失败（视频已删/链接错/风控）:`);
+      for (const m of miss.slice(0, 5)) log(`    - ${m}`);
+      if (miss.length > 5) log(`    …及其余 ${miss.length - 5} 条`);
+    }
   } else {
     results = runMatch(
       pending.map((r) => ({

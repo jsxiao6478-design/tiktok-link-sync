@@ -21,10 +21,21 @@
  * 需要本地守护进程（带可用代理的浏览器通道）补位。
  */
 
+const http = require('http');
+const https = require('https');
+const tls = require('tls');
+const zlib = require('zlib');
+
 const DEFAULT_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** 解析代理地址（TIKTOK_PROXY / config.proxy）→ 字符串或 null */
+function resolveProxy(config = {}) {
+  const p = process.env.TIKTOK_PROXY || config.proxy || '';
+  return p ? String(p).trim() : null;
+}
 
 function normalizeUsername(u) {
   return String(u || '')
@@ -48,7 +59,88 @@ function localDate(ts, timeZone) {
   }
 }
 
+/**
+ * 经 HTTP 代理（CONNECT 隧道）发 HTTPS GET —— 零依赖版 ProxyAgent。
+ *
+ * 为什么不用 NODE_USE_ENV_PROXY：实测 Node 22.22.2 里该环境变量不生效
+ * （fetch 依然直连），它要到 Node 24 才可用；装 undici 又要动 package-lock。
+ * 用 node:http 的 CONNECT + node:https 的 createConnection 即可，
+ * 响应解析完全走 Node 自带的 HTTP parser（chunked 等都自动处理）。
+ */
+function proxiedHttpsGet(url, proxy, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const timeout = opts.timeout ?? 20000;
+    const target = new URL(url);
+    let p;
+    try {
+      p = new URL(proxy);
+    } catch {
+      return reject(new Error(`代理地址不合法: ${proxy}`));
+    }
+
+    const connectReq = http.request({
+      host: p.hostname,
+      port: Number(p.port) || 80,
+      method: 'CONNECT',
+      path: `${target.hostname}:443`,
+      timeout,
+    });
+    connectReq.once('connect', (res, socket) => {
+      if (res.statusCode !== 200) {
+        socket.destroy();
+        return reject(new Error(`代理 CONNECT 失败: HTTP ${res.statusCode}`));
+      }
+      const headers = {
+        Host: target.hostname,
+        'User-Agent': opts.userAgent || DEFAULT_UA,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate',
+        Connection: 'close',
+        ...(opts.referer ? { Referer: opts.referer } : {}),
+      };
+      const req = https.request({
+        method: 'GET',
+        path: `${target.pathname}${target.search}`,
+        headers,
+        // 注意：这里刻意不设 agent（连 false 都不行）——设了 agent:false
+        // Node 会新建默认 Agent 走自己的 TCP/TLS，忽略 createConnection，
+        // 请求就绕开隧道直连了（实测 ECONNREFUSED）。只有完全不传 agent，
+        // per-request 的 createConnection 才会生效。
+        createConnection: () => tls.connect({ socket, servername: target.hostname }),
+        timeout,
+      }, (r) => {
+        const chunks = [];
+        r.on('data', (c) => chunks.push(c));
+        r.on('error', reject);
+        r.on('end', () => {
+          let buf = Buffer.concat(chunks);
+          try {
+            const enc = String(r.headers['content-encoding'] || '').toLowerCase();
+            if (enc === 'gzip') buf = zlib.gunzipSync(buf);
+            else if (enc === 'deflate') buf = zlib.inflateSync(buf);
+            else if (enc === 'br') buf = zlib.brotliDecompressSync(buf);
+          } catch { /* 解压失败就按原文返回，宁可乱码也不中断 */ }
+          resolve({ status: r.statusCode, text: buf.toString('utf8') });
+        });
+        r.on('close', () => { socket.destroy(); });
+      });
+      req.on('timeout', () => req.destroy(new Error(`响应超时（>${timeout}ms）`)));
+      req.on('error', (e) => { socket.destroy(); reject(e); });
+      req.end();
+    });
+    connectReq.once('timeout', () => connectReq.destroy(new Error(`代理连接超时（>${timeout}ms）`)));
+    connectReq.once('error', reject);
+    connectReq.end();
+  });
+}
+
 async function httpGet(url, opts = {}) {
+  // 配了代理就走 CONNECT 隧道（本机没有境外直连能力）；
+  // 云端 runner 不配代理，继续走原生 fetch 直连。
+  const proxy = opts.proxy || null;
+  if (proxy) return proxiedHttpsGet(url, proxy, opts);
+
   const timeout = opts.timeout ?? 20000;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeout);
@@ -162,10 +254,12 @@ async function fetchAccountVideosHttp(username, config = {}) {
   const uname = normalizeUsername(username);
   const tz = config.timezone || 'Asia/Shanghai';
   const delay = config.httpDelayMs ?? 350;
+  const proxy = resolveProxy(config);
 
   const embedRes = await httpGet(`https://www.tiktok.com/embed/@${uname}`, {
     referer: 'https://www.tiktok.com/',
     timeout: config.httpTimeoutMs ?? 20000,
+    proxy,
   });
   if (embedRes.status !== 200) {
     throw new Error(`嵌入页返回 HTTP ${embedRes.status}`);
@@ -186,6 +280,7 @@ async function fetchAccountVideosHttp(username, config = {}) {
       const r = await httpGet(url, {
         referer: `https://www.tiktok.com/@${uname}`,
         timeout: config.httpTimeoutMs ?? 20000,
+        proxy,
       });
       if (r.status === 200) detail = parseVideoDetail(r.text);
       else detailErrors.push(`${item.id} → HTTP ${r.status}`);
@@ -227,6 +322,7 @@ async function fetchVideoStatsHttp(username, videoId, config = {}) {
   const uname = normalizeUsername(username);
   const r = await httpGet(`https://www.tiktok.com/@${uname}/video/${videoId}`, {
     timeout: config.httpTimeoutMs ?? 20000,
+    proxy: resolveProxy(config),
   });
   if (r.status !== 200) throw new Error(`HTTP ${r.status}`);
   const d = parseVideoDetail(r.text);
@@ -242,5 +338,6 @@ module.exports = {
   localDate,
   normalizeUsername,
   httpGet,
+  resolveProxy,
   DEFAULT_UA,
 };

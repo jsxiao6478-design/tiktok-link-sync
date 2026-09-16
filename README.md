@@ -150,8 +150,19 @@ node src/sync.cjs --source feishu --refresh-stats   # 只刷播放量/点赞数
 
 想把整条链路搬到云端，做到「关机也不影响、换任何电脑都能操作」：
 
+**一条命令搞定部署**：
+
 ```bash
-node bin/smoke-test.cjs          # 先验证：出口 IP / TikTok 可达 / 飞书权限 / 真抓一次
+npm run deploy:github
+```
+
+交互式向导，只会问你两样东西（输入时不回显）：飞书 `App Secret` + GitHub 令牌。
+其余全自动：环境自检 → 飞书权限自检 → 建公开仓库 → 推代码 → 配 Secrets → 跑第一轮连通性测试。
+
+想先单独验证本机侧（不部署）：
+
+```bash
+node bin/smoke-test.cjs          # 出口 IP / TikTok 可达 / 飞书权限 / 真抓一次
 node bin/smoke-test.cjs --skip-crawl   # 只测网络与飞书（秒级）
 ```
 
@@ -162,7 +173,8 @@ node bin/smoke-test.cjs --skip-crawl   # 只测网络与飞书（秒级）
 | 运行位置 | GitHub Actions（ubuntu runner），每 30 分钟一轮 + 可手动触发 |
 | 飞书写入身份 | bot（`tenant_access_token`，2 小时自动续期，**不会像 OAuth 那样约 7 天后过期**） |
 | 硬门槛 | GitHub 机房 IP 能不能访问 TikTok —— 用 `smoke-only` 模式先测，不通就得配代理 |
-| 唯一免费前提 | 仓库设为 **public**（私有仓库 2000 分钟/月不够用，本方案约需 2880 分钟） |
+| 成本 | **完全免费**：公开仓库的标准 runner 不限时长、不计费 |
+| 长期免维护 | workflow 每月自动提交一次 `.keepalive`，避免仓库 60 天无活动导致定时任务被停用 |
 | 响应延迟 | 按钮从「≤60 秒」变成「≤30 分钟」（云端最密只能到这个粒度） |
 | 上云后 | `npm run watch:stop` 停掉本机守护进程，避免两边重复抓取（文件锁只在同一台机器生效） |
 

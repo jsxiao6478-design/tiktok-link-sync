@@ -29,6 +29,14 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 const GH_VERSION = '2.101.0'; // 自动下载 gh CLI 时使用的版本
 
+/**
+ * GitHub 令牌。刻意不用 `gh auth login --with-token`：
+ * 那条命令会强制校验令牌是否带 read:org 权限（经典 PAT 默认不带），
+ * 于是「repo + workflow」这种够用的令牌反而被拒。改成直接把令牌塞进
+ * gh 子进程的 GH_TOKEN 环境变量 —— gh 对它的校验宽松得多，功能完全一样。
+ */
+let GH_AUTH = '';
+
 // ────────────────────────────────────────────────────────────
 // 输出
 // ────────────────────────────────────────────────────────────
@@ -307,17 +315,32 @@ function ensureGh(proxy) {
  * 实测 `NO_PROXY=*` 可以让 gh 完全绕过代理直连 GitHub，
  * 所以这里在遇到代理类错误时自动重试一次，用户不用自己折腾系统设置。
  */
+/**
+ * 带令牌推送。
+ * 我们没走 `gh auth login`，所以 git 拿不到 gh 的凭据；改为显式用
+ * `-c http.extraHeader` 传 Basic 认证头 —— 令牌既不落盘、也不写进 remote URL。
+ */
+function gitPush(branch, proxy) {
+  const b64 = Buffer.from(`x-access-token:${GH_AUTH}`, 'utf8').toString('base64');
+  const args = ['-c', `http.extraHeader=Authorization: Basic ${b64}`];
+  if (proxy) args.push('-c', `http.proxy=${proxy}`);
+  args.push('push', '-u', 'origin', branch);
+  return run('git', args, { timeout: 240000 });
+}
+
 function gh(ghBin, args, opts = {}) {
-  const r = run(ghBin, args, opts);
+  // 始终把令牌注入子进程环境：免去 gh auth login（它要求 read:org 权限）
+  const withToken = (o) => ({ ...o, env: { ...(o.env || {}), GH_TOKEN: GH_AUTH } });
+  const r = run(ghBin, args, withToken(opts));
   if (r.status === 0) return r;
   const blob = `${r.stdout || ''}${r.stderr || ''}`;
   if (!/proxyconnect|actively refused|ECONNREFUSED|proxy|timed? ?out/i.test(blob)) return r;
 
   info('检测到代理不通，正在绕过代理直连 GitHub 重试…');
   const r2 = run(ghBin, args, {
-    ...opts,
+    ...withToken(opts),
     env: {
-      ...(opts.env || {}),
+      ...withToken(opts).env,
       NO_PROXY: '*',
       no_proxy: '*',
       HTTPS_PROXY: '',
@@ -505,6 +528,7 @@ async function main() {
     }
     ok('已收到 GitHub 令牌');
   }
+  GH_AUTH = ghToken;
 
   // ── 3. 飞书权限自检 ─────────────────────────────────────
   step(3, TOTAL, '飞书应用权限自检');
@@ -543,24 +567,35 @@ async function main() {
   // ── 4. 登录 GitHub + 建仓库 ─────────────────────────────
   step(4, TOTAL, '登录 GitHub 并创建公开仓库');
 
-  const auth = gh(ghBin, ['auth', 'login', '--with-token'], { input: ghToken + '\n' });
-  if (auth.status !== 0) {
-    bad('GitHub 令牌无效或权限不足');
-    info(auth.stderr || auth.stdout);
-    process.exit(1);
-  }
-  ok('令牌有效');
-
+  // 不用 `gh auth login`：它硬性要求令牌带 read:org，而「repo + workflow」
+  // 已经足够建仓库、推代码、写 Secrets、跑 workflow。改用 GH_TOKEN 注入。
   const me = gh(ghBin, ['api', 'user', '-q', '.login']);
   if (me.status !== 0 || !me.stdout) {
-    bad('无法读取 GitHub 账号信息');
-    info(me.stderr);
+    bad('GitHub 令牌无效或已过期');
+    info(me.stderr || me.stdout);
+    log('');
+    info(`重新生成：${cyan('https://github.com/settings/tokens/new')}`);
+    info('需勾选 repo（整个大项）和 workflow');
     process.exit(1);
   }
   const login = me.stdout.split('\n')[0].trim();
-  ok(`已登录：${login}`);
+  ok(`令牌有效，账号：${login}`);
 
-  gh(ghBin, ['auth', 'setup-git']); // 让 git push 也走这个令牌
+  // 提前校验权限范围，免得等到建仓库/推代码才报错
+  const scopeProbe = gh(ghBin, ['api', '-i', '/user']);
+  const scopeLine = /x-oauth-scopes:\s*(.*)/i.exec(scopeProbe.stdout || '');
+  const scopes = scopeLine ? scopeLine[1].toLowerCase() : '';
+  if (scopes) {
+    const missing = ['repo', 'workflow'].filter((s) => !scopes.includes(s));
+    if (missing.length) {
+      bad(`令牌缺少权限：${missing.join('、')}`);
+      info(`当前令牌的权限：${scopes || '(无)'}`);
+      log('');
+      info(`去重新生成一个带 repo 和 workflow 的令牌：${cyan('https://github.com/settings/tokens/new')}`);
+      process.exit(1);
+    }
+    ok(`权限范围正确（${scopes}）`);
+  }
 
   const full = `${login}/${repoName}`;
   const exists = gh(ghBin, ['repo', 'view', full, '--json', 'name']);
@@ -585,7 +620,6 @@ async function main() {
       '.',
       '--remote',
       'origin',
-      '--push',
       '--description',
       '按账号+标题+日期自动补全 TikTok 视频链接并回填飞书多维表格（GitHub Actions 云端定时同步）',
     ]);
@@ -596,42 +630,32 @@ async function main() {
       info('常见原因：令牌没勾 repo 权限；或该用户名下已有同名仓库。');
       process.exit(1);
     }
-    ok(`已创建公开仓库 ${full} 并推送代码`);
+    ok(`已创建公开仓库 ${full}（下一步推送代码）`);
   }
   log(`  仓库地址：${cyan(`https://github.com/${full}`)}`);
 
   // ── 5. 推送代码 ─────────────────────────────────────────
   step(5, TOTAL, '推送代码');
 
-  const push = run('git', ['push', '-u', 'origin', branch]);
-  if (push.status !== 0) {
-    // 很多网络环境需要走代理才能 push
-    if (proxy && probeProxy(proxy)) {
-      warn('直连推送失败，尝试通过本机代理推送…');
-      run('git', ['config', `http.https://github.com.proxy`, proxy]);
-      const push2 = run('git', ['push', '-u', 'origin', branch]);
-      if (push2.status !== 0) {
-        bad('推送仍然失败');
-        info(push2.stderr);
-        log('');
-        info(`手动重试：git push -u origin ${branch}`);
-        process.exit(1);
-      }
-      ok('已通过代理推送成功');
-    } else if (proxy) {
-      bad('推送失败，而且本机代理端口没有响应');
-      info(`代理地址：${proxy}`);
-      info('→ 把代理客户端重新打开，然后重跑本脚本即可（已完成的步骤会自动跳过）。');
-      info(push.stderr);
-      process.exit(1);
-    } else {
-      bad('推送失败');
-      info(push.stderr);
-      process.exit(1);
-    }
-  } else {
-    ok(`已推送到 origin/${branch}`);
+  let push = gitPush(branch, '');
+  if (push.status !== 0 && proxy && probeProxy(proxy)) {
+    // 部分网络环境（尤其国内）必须走代理才能 push
+    warn('直连推送失败，改用本机代理重试…');
+    push = gitPush(branch, proxy);
   }
+  if (push.status !== 0) {
+    bad('推送失败');
+    info(push.stderr || push.stdout);
+    log('');
+    if (proxy && !probeProxy(proxy)) {
+      info(`本机代理端口没有响应（${proxy}）—— 把代理客户端重新打开再重跑本脚本即可（已完成步骤会自动跳过）。`);
+    } else {
+      info('常见原因：令牌缺少 repo 权限，或网络无法访问 github.com。');
+    }
+    info(`手动重试：git push -u origin ${branch}`);
+    process.exit(1);
+  }
+  ok(`已推送到 origin/${branch}`);
 
   // ── 6. 写入 Secrets ─────────────────────────────────────
   step(6, TOTAL, '写入仓库密钥（Secrets）');
@@ -793,8 +817,9 @@ function finish(full) {
   log('     想保留「按钮 60 秒响应」又不想和云端打架，就用：');
   log(`     ${dim('npm run watch:stop && npm run watch:start -- --stats-every 0')}`);
   log('');
-  log('  注意：这个令牌现在存在本机 gh 配置里，不用了可以这样撤销：');
-  log(`     ${dim('gh auth logout')}  ${dim('（令牌本体去 GitHub 设置页 Delete）')}`);
+  log('  注意：本脚本没有把令牌写进任何配置文件（只在内存与子进程环境里用过）；');
+  log('       不想要了直接去 GitHub 设置页 Delete 即可：');
+  log(`     ${dim('https://github.com/settings/tokens')}`);
   log('');
 }
 

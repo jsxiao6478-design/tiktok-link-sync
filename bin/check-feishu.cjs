@@ -6,10 +6,13 @@
  *   node bin/check-feishu.cjs
  *   FEISHU_APP_SECRET=xxx node bin/check-feishu.cjs    # 临时用别的密钥测
  *
- * 依次做三件事，任一失败就停下并给出对应的修复动作：
+ * 依次做四件事，任一失败就停下并给出对应的修复动作：
  *   ① 用 app_id + app_secret 换 tenant_access_token  → 验密钥本身是否正确
  *   ② 用该 token 读多维表格 1 条记录                  → 验 bitable:app 权限 + 是否发布了版本
- *   ③ 打印表格可见的行数与字段名                      → 验应用是否被加为该表格的协作者
+ *   ③ 把读到的值原样写回 1 条记录                     → 验写权限（只读权限能过 ② 但过不了 ③）
+ *   ④ 列出表格协作者，确认应用在名单里                → 验「加协作者」这一步
+ *
+ * ③ 是幂等写（写回原值），不会改动你的数据。
  */
 const path = require('path');
 const fs = require('fs');
@@ -77,6 +80,22 @@ async function main() {
     process.exit(1);
   }
 
+  // 顺带查出「应用名称」—— 加协作者时要按这个名字搜，很多人不知道去哪看
+  try {
+    const ar = await fetch(
+      `https://open.feishu.cn/open-apis/application/v6/applications/${appId}?lang=zh_cn`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) }
+    );
+    const ja = await ar.json();
+    const name = ja.code === 0 && ja.data && ja.data.app && ja.data.app.app_name;
+    if (name) {
+      info(`应用名称  = ${C.bold}${name}${C.reset}${C.dim}  ← 加协作者时按这个名字搜${C.reset}`);
+      if (ja.data.app.online_version_id) info(`线上版本  = ${ja.data.app.online_version_id}`);
+    }
+  } catch (_) {
+    /* 拿不到名称不影响自检，忽略 */
+  }
+
   // ── ② 读表（验权限 + 版本发布） ────────────────────────────
   step('②', '读多维表格（验 bitable:app 权限是否已生效）');
   const api = `https://open.feishu.cn/open-apis/bitable/v1/apps/${baseToken}/tables/${tableId}/records?page_size=1`;
@@ -124,10 +143,78 @@ async function main() {
   }
 
   console.log('');
+  info(`${C.bold}③ 写入测试（把读到的值原样写回，不改动数据）${C.reset}`);
+  const playsField = (f.fields && f.fields.plays) || '播放量';
+  const first = j2.data && j2.data.items && j2.data.items[0];
+  if (!first) {
+    info('表格里还没有任何记录，跳过写入测试（权限已通过读取验证）');
+  } else {
+    const recId = first.record_id || first.id;
+    const rawPlays = first.fields ? first.fields[playsField] : undefined;
+    const playsNum = Number(Array.isArray(rawPlays) ? rawPlays[0] : rawPlays);
+    if (!Number.isFinite(playsNum)) {
+      info(`记录里「${playsField}」没有可回写的数字，跳过写入测试（权限已通过读取验证）`);
+    } else {
+      try {
+        const wr = await fetch(
+          `https://open.feishu.cn/open-apis/bitable/v1/apps/${baseToken}/tables/${tableId}/records/${recId}`,
+          {
+            method: 'PUT',
+            headers: { ...hdr, 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify({ fields: { [playsField]: playsNum } }),
+            signal: AbortSignal.timeout(20000),
+          }
+        );
+        const jw = await wr.json();
+        if (jw.code === 0) {
+          ok(`写权限正常（已把「${playsField}」= ${playsNum} 原值写回，数据未变）`);
+        } else {
+          bad(`写入被拒（code=${jw.code}）：${String(jw.msg || '').slice(0, 160)}`);
+          info('→ 若提示只读权限，说明还缺 bitable:app（写）或 base:record:update，回开发者后台补权限并重新发布版本。');
+          process.exit(1);
+        }
+      } catch (e) {
+        bad(`写入请求失败：${e.message}`);
+        process.exit(1);
+      }
+    }
+  }
+
+  console.log('');
+  info(`${C.bold}④ 协作者确认${C.reset}`);
+  try {
+    const mr = await fetch(
+      `https://open.feishu.cn/open-apis/drive/v1/permissions/${baseToken}/members?type=bitable`,
+      { headers: hdr, signal: AbortSignal.timeout(20000) }
+    );
+    const jm = await mr.json();
+    if (jm.code === 0) {
+      const apps = (jm.data.items || []).filter((m) => m.member_type === 'appid');
+      apps.forEach((m) => {
+        const me = m.member_id === appId;
+        console.log(
+          `  ${me ? C.green : C.dim}${me ? '[本应用]' : '[其他应用]'}${C.reset} ${m.member_id}  权限=${m.perm}${me ? '' : C.dim + '（与本次部署无关）' + C.reset}`
+        );
+      });
+      if (apps.some((m) => m.member_id === appId)) {
+        const mine = apps.find((m) => m.member_id === appId);
+        if (mine.perm === 'edit' || mine.perm === 'full_access') ok(`本应用已在协作者名单里，权限「${mine.perm === 'edit' ? '可编辑' : '完全访问'}」`);
+        else bad(`本应用在名单里但权限是「${mine.perm}」，需要「可编辑」才能写数据`);
+      } else {
+        bad('本应用不在协作者名单里');
+        info('→ 打开多维表格 → 右上角「分享」→ 添加协作者 → 搜索应用名称 → 设为「可编辑」');
+      }
+    } else {
+      info(`协作者列表读取受限（code=${jm.code}），可跳过此步 —— 前一、二步通过即已证明访问可用`);
+    }
+  } catch (e) {
+    info(`协作者列表读取失败（${e.message}），可跳过`);
+  }
+
+  console.log('');
   console.log(`${C.green}${C.bold}结论：第一步已全部完成 ✅${C.reset}`);
   console.log(`${C.dim}这套凭证可以交给 GitHub Actions 用了。${C.reset}\n`);
 }
-
 main().catch((e) => {
   console.error(`${C.red}未预期错误：${C.reset}`, e);
   process.exit(1);

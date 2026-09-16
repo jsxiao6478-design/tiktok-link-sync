@@ -141,6 +141,29 @@ node src/sync.cjs --source feishu --refresh-stats   # 只刷播放量/点赞数
 
 > 想立刻刷一次：`node src/sync.cjs --source feishu --refresh-stats --force`（`--force` 用来绕过 25 分钟闸门）
 
+### 5) 云端托管：不依赖自己的电脑（GitHub Actions）
+
+上面 1~4 条的所有调度**都跑在本机**（包括那两个「WorkBuddy 定时任务」——它们由本机客户端执行，
+不是飞书云上的），所以本机关机 / 断网 / 休眠就全都停了。
+
+想把整条链路搬到云端，做到「关机也不影响、换任何电脑都能操作」：
+
+```bash
+node bin/smoke-test.cjs          # 先验证：出口 IP / TikTok 可达 / 飞书权限 / 真抓一次
+node bin/smoke-test.cjs --skip-crawl   # 只测网络与飞书（秒级）
+```
+
+完整部署步骤见 **[DEPLOY-GITHUB.md](DEPLOY-GITHUB.md)**。要点速览：
+
+| 项 | 说明 |
+|---|---|
+| 运行位置 | GitHub Actions（ubuntu runner），每 30 分钟一轮 + 可手动触发 |
+| 飞书写入身份 | bot（`tenant_access_token`，2 小时自动续期，**不会像 OAuth 那样约 7 天后过期**） |
+| 硬门槛 | GitHub 机房 IP 能不能访问 TikTok —— 用 `smoke-only` 模式先测，不通就得配代理 |
+| 唯一免费前提 | 仓库设为 **public**（私有仓库 2000 分钟/月不够用，本方案约需 2880 分钟） |
+| 响应延迟 | 按钮从「≤60 秒」变成「≤30 分钟」（云端最密只能到这个粒度） |
+| 上云后 | `npm run watch:stop` 停掉本机守护进程，避免两边重复抓取（文件锁只在同一台机器生效） |
+
 ### 守护进程：让按钮真正"立刻"
 
 定时任务最密只能设到 5 分钟（飞书平台硬性限制），所以光靠定时任务，按钮至少要等 5 分钟才会被处理。
@@ -227,7 +250,7 @@ npm run watch          # 前台跑（Ctrl+C 退出，看日志用）
 
 ## 配置
 
-`config.json`：
+`config.json`（本机用；**已加入 `.gitignore`，不入库**）：
 
 | 项 | 说明 |
 |---|---|
@@ -238,9 +261,24 @@ npm run watch          # 前台跑（Ctrl+C 退出，看日志用）
 | `matchThreshold` | 匹配阈值，调低=更激进，调高=更严格 |
 | `columns` | CSV 模式的表头列名映射 |
 | `feishu` | 飞书表坐标（baseToken / tableId / 字段名 / 状态选项） |
+| `feishu.appId` / `appSecret` | 可选。配了就自动切到 openapi（bot）后端，不配则用本机 lark-cli |
 
 > 记录跨度较大时，把 `maxScroll` 调大（例如 20）以覆盖更早的视频。
 > 换一张飞书表：改 `config.json` 里的 `feishu.baseToken` 和 `feishu.tableId` 即可。
+
+`config.ci.json`（云端用；**入库，不含任何凭证**）：只有运行参数和字段映射，
+表格坐标与 app 凭证全部走环境变量，避免密钥进仓库。
+
+支持的环境变量（全部可选，适合 CI / 服务器）：
+
+| 变量 | 作用 |
+|---|---|
+| `FEISHU_APP_ID` / `FEISHU_APP_SECRET` | 应用凭证。设了就切到 openapi（bot）后端 |
+| `FEISHU_BACKEND` | 强制指定后端：`openapi` 或 `lark-cli` |
+| `FEISHU_BASE_TOKEN` / `FEISHU_TABLE_ID` / `FEISHU_URL` | 覆盖表格坐标 |
+| `TIKTOK_PROXY` | 抓取代理（覆盖 config 里的 proxy） |
+| `CHROME_PATH` / `TIKTOK_CHROME_PATH` | Chrome 路径；路径不存在时交给 playwright 自己找（Linux runner 靠这个） |
+| `TZ` | 容器时区，云端建议设 `Asia/Shanghai` |
 
 ---
 
@@ -258,14 +296,18 @@ npm run watch          # 前台跑（Ctrl+C 退出，看日志用）
 
 ```
 tiktok-link-sync/
-├── config.json          配置（含飞书表坐标）
+├── config.json          本机配置（含表格坐标与本机代理，不入库）
+├── config.ci.json       云端配置（不含任何凭证，入库）
+├── DEPLOY-GITHUB.md     云端部署指南（GitHub Actions）
+├── .github/workflows/tiktok-sync.yml   云端每 30 分钟同步 + 手动烟雾测试
 ├── run.bat              Windows 一键运行（CSV 模式）
 ├── run-feishu.bat       Windows 一键运行（飞书表格模式）
-├── package.json         npm scripts：sync / watch:start / watch:stop / watch:restart / watch:status
+├── package.json         npm scripts：sync / sync:stats / smoke / watch:*
 ├── bin/
 │   ├── start-watch.cjs  后台启动守护进程
 │   ├── stop-watch.cjs   结束守护进程（并写 watch.disabled）
 │   ├── watch-status.cjs 一键自检（心跳 / PID / 锁 / 自启）
+│   ├── smoke-test.cjs   上云可行性烟雾测试（出口 IP / TikTok 可达 / 飞书权限）
 │   ├── watchdog.vbs     看门狗：心跳超时就重新拉起守护进程
 │   └── autostart.bat    开机自启（已复制到「启动」文件夹）
 ├── data/
@@ -281,7 +323,8 @@ tiktok-link-sync/
 │   └── cache/           原始抓取缓存（每个账号一个 json）
 ├── src/
 │   ├── sync.cjs         主流程（CSV / 飞书双模式，自带自愈文件锁 + --refresh-stats）
-│   ├── feishu.cjs       飞书多维表格读写
+│   ├── config.cjs       配置加载（config.json + 环境变量覆盖）
+│   ├── feishu.cjs       飞书多维表格读写（lark-cli / OpenAPI 双后端）
 │   ├── crawler.cjs      抓取引擎
 │   ├── matcher.cjs      匹配引擎
 │   ├── csv.cjs          CSV 读写

@@ -15,7 +15,9 @@
 
 **飞书多维表格：TikTok 视频链接管理**
 
-https://ja0zlzeurz8.feishu.cn/base/YpZobYZ22aSL44s57RFcrmeWn4g
+> 出于脱敏，仓库里不写具体地址。表格链接请从本机 `config.json` 的 `feishu.url` 取值，
+> 形如 `https://<租户域名>.feishu.cn/base/<BASE_TOKEN>?table=<TABLE_ID>`：
+> `/base/` 后面那段是 `FEISHU_BASE_TOKEN`，`table=` 后面那段是 `FEISHU_TABLE_ID`。
 
 表结构（表名「视频链接补全」）：
 

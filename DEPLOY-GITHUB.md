@@ -83,8 +83,8 @@ git push -u origin main
 |---|---|---|
 | `FEISHU_APP_ID` | 第二节拿到的 App ID | ✅ |
 | `FEISHU_APP_SECRET` | 第二节拿到的 App Secret | ✅ |
-| `FEISHU_BASE_TOKEN` | `YpZobYZ22aSL44s57RFcrmeWn4g` | ✅ |
-| `FEISHU_TABLE_ID` | `tbl7UREfqxQ1VgwG` | ✅ |
+| `FEISHU_BASE_TOKEN` | 表格链接里 `/base/` 之后那段（本机 `config.json` → `feishu.baseToken`） | ✅ |
+| `FEISHU_TABLE_ID` | 表格链接里 `table=` 之后那段（本机 `config.json` → `feishu.tableId`） | ✅ |
 | `TIKTOK_PROXY` | 公网代理地址，如 `http://user:pass@1.2.3.4:8080` | 可选，见第四节 |
 
 > `TIKTOK_PROXY` 不填＝直连。你本机那个 `127.0.0.1:15236` **在云端用不了**（那是本机回环地址），要填必须是公网可达的代理。
@@ -190,8 +190,8 @@ npx playwright install chromium
 
 # 配好环境变量后，用云端同一套配置试跑
 FEISHU_APP_ID=xxx FEISHU_APP_SECRET=xxx \
-FEISHU_BASE_TOKEN=YpZobYZ22aSL44s57RFcrmeWn4g \
-FEISHU_TABLE_ID=tbl7UREfqxQ1VgwG \
+FEISHU_BASE_TOKEN=<表格链接 /base/ 后那段> \
+FEISHU_TABLE_ID=<表格链接 table= 后那段> \
 node bin/smoke-test.cjs --config config.ci.json
 ```
 

@@ -92,9 +92,13 @@ function feishuConfig(config) {
 const OPENAPI_BASE = 'https://open.feishu.cn/open-apis';
 const API_TIMEOUT_MS = 60 * 1000;
 
-/** 应用凭证：环境变量优先，其次 config.feishu.appId / appSecret */
+/**
+ * 应用凭证：环境变量优先，其次 config.feishu.appId / appSecret。
+ * 注意这里**不经过 feishuConfig()**：只判断「有没有 app 凭证」不该依赖表格坐标，
+ * 否则用户漏配 baseToken 时会在「判定后端」这一步就抛出一个误导性的错误。
+ */
 function appCreds(config) {
-  const f = feishuConfig(config);
+  const f = (config && config.feishu) || {};
   const appId = process.env.FEISHU_APP_ID || f.appId;
   const appSecret = process.env.FEISHU_APP_SECRET || f.appSecret;
   return appId && appSecret ? { appId, appSecret } : null;

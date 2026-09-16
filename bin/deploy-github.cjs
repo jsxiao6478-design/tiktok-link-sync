@@ -229,6 +229,29 @@ function findGh() {
   return null;
 }
 
+/**
+ * 探测代理是否活着：能拿回任何 HTTP 状态码（哪怕 401/403）就算活，
+ * 只有连不上（000 / 超时）才算死。结果记忆化，避免重复探测。
+ */
+const proxyAliveCache = new Map();
+function probeProxy(proxy) {
+  if (proxyAliveCache.has(proxy)) return proxyAliveCache.get(proxy);
+  let alive = false;
+  try {
+    const r = spawnSync(
+      'curl',
+      ['-s', '-o', os.devNull, '-w', '%{http_code}', '--max-time', '8', '-x', proxy, 'https://api.github.com'],
+      { encoding: 'utf8', windowsHide: true, timeout: 13000 }
+    );
+    const code = Number(String(r.stdout || '').trim());
+    alive = Number.isFinite(code) && code > 0;
+  } catch (_) {
+    alive = false;
+  }
+  proxyAliveCache.set(proxy, alive);
+  return alive;
+}
+
 function ensureGh(proxy) {
   const found = findGh();
   if (found) return found;
@@ -276,8 +299,40 @@ function ensureGh(proxy) {
   return bin;
 }
 
+/**
+ * gh 在 Windows 上读的是**系统代理设置**（不是环境变量）。
+ * 如果用户把代理客户端关了、但「设置 → 网络和 Internet → 代理」的开关还开着，
+ * gh 会去连一个已经死掉的端口，直接报：
+ *   proxyconnect tcp: dial tcp [::1]:15236: ... actively refused it.
+ * 实测 `NO_PROXY=*` 可以让 gh 完全绕过代理直连 GitHub，
+ * 所以这里在遇到代理类错误时自动重试一次，用户不用自己折腾系统设置。
+ */
 function gh(ghBin, args, opts = {}) {
-  return run(ghBin, args, opts);
+  const r = run(ghBin, args, opts);
+  if (r.status === 0) return r;
+  const blob = `${r.stdout || ''}${r.stderr || ''}`;
+  if (!/proxyconnect|actively refused|ECONNREFUSED|proxy|timed? ?out/i.test(blob)) return r;
+
+  info('检测到代理不通，正在绕过代理直连 GitHub 重试…');
+  const r2 = run(ghBin, args, {
+    ...opts,
+    env: {
+      ...(opts.env || {}),
+      NO_PROXY: '*',
+      no_proxy: '*',
+      HTTPS_PROXY: '',
+      https_proxy: '',
+      HTTP_PROXY: '',
+      http_proxy: '',
+      ALL_PROXY: '',
+      all_proxy: '',
+    },
+  });
+  if (r2.status === 0) {
+    ok('已绕过代理直连成功');
+    return r2;
+  }
+  return r;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -358,6 +413,19 @@ async function main() {
   ok('已读到表格坐标（不会打印出来）');
 
   const proxy = (cfg && cfg.proxy) || process.env.HTTPS_PROXY || '';
+
+  // 代理体检：Windows 系统代理开关可能指着一个已经关掉的代理端口，
+  // 这会让 gh / git 全部报 proxyconnect 错。提前探一次，把话说清楚。
+  if (proxy) {
+    const alive = probeProxy(proxy);
+    if (alive) {
+      ok(`代理可用：${proxy}`);
+    } else {
+      warn(`代理端口没有响应：${proxy}`);
+      info('常见原因：代理客户端已被关闭，但 Windows 的「使用代理服务器」开关还开着。');
+      info('脚本会自动改走直连（已实测可行），但如果直连不稳定，请把代理客户端重新打开。');
+    }
+  }
 
   const ghBin = ensureGh(proxy);
   if (!ghBin) process.exit(1);
@@ -538,8 +606,8 @@ async function main() {
   const push = run('git', ['push', '-u', 'origin', branch]);
   if (push.status !== 0) {
     // 很多网络环境需要走代理才能 push
-    warn('直连推送失败，尝试通过本机代理推送…');
-    if (proxy) {
+    if (proxy && probeProxy(proxy)) {
+      warn('直连推送失败，尝试通过本机代理推送…');
       run('git', ['config', `http.https://github.com.proxy`, proxy]);
       const push2 = run('git', ['push', '-u', 'origin', branch]);
       if (push2.status !== 0) {
@@ -550,6 +618,12 @@ async function main() {
         process.exit(1);
       }
       ok('已通过代理推送成功');
+    } else if (proxy) {
+      bad('推送失败，而且本机代理端口没有响应');
+      info(`代理地址：${proxy}`);
+      info('→ 把代理客户端重新打开，然后重跑本脚本即可（已完成的步骤会自动跳过）。');
+      info(push.stderr);
+      process.exit(1);
     } else {
       bad('推送失败');
       info(push.stderr);

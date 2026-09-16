@@ -2,6 +2,22 @@
 
 把「抓取 TikTok + 写回飞书表格」这套流程放到 GitHub 云端跑，**你自己的电脑关机、断网、换电脑都不影响**。
 
+> **全程免费**：本方案用 GitHub **公开仓库**的免费 Actions —— 公开仓库的标准 runner
+> **不限时长、不计费**，所以可以保持每 30 分钟同步一次，不需要为了省额度而降低频率。
+> 代码里不含任何密钥与表格地址（`config.json` / `data/` 都已被 `.gitignore` 排除，凭证全走 Secrets）。
+
+---
+
+## 零、总览：你只需要做三件事
+
+| 步骤 | 做什么 | 大概耗时 |
+|---|---|---|
+| ① | **飞书开放平台**：给应用开 `bitable:app` 权限 → **创建版本并发布** → 把应用加为表格「可编辑」协作者 | 5 分钟 |
+| ② | **GitHub**：注册账号（没有的话）→ 生成一个部署令牌 | 10 分钟 |
+| ③ | **跑一条命令**：在本项目目录执行 `npm run deploy:github`，按提示粘贴 App Secret 和令牌 | 1 分钟操作 + 等 5 分钟 |
+
+做完这三件，剩下的脚本全包了。之后云端每 30 分钟自动同步一轮，无需任何人工干预。
+
 ---
 
 ## 一、先说清楚它能做到什么、做不到什么
@@ -55,29 +71,80 @@
 
 ---
 
-## 三、GitHub：建仓库 + 配 Secrets
+## 三、GitHub：注册 + 一键部署
 
-### 1. 建一个 **Public** 仓库
+> 这一节是**全程免费**的关键：公开仓库（Public）的标准 runner **不限时长、不计费**，
+> 所以可以放心保持每 30 分钟同步一次，不需要为了省额度而降低频率。
 
-> **为什么必须 public**：私有仓库的 Actions 免费额度是 2000 分钟/月，而本方案每 30 分钟跑一次、单次约 2 分钟 ≈ 2880 分钟/月，会超支。公开仓库的标准 runner **免费且不限时长**。
-> 代码里不含任何密钥（`config.json` 已被 `.gitignore` 排除，云端用的是 `config.ci.json`，凭证全走 Secrets）。
+### 1. 注册 GitHub 账号（已有账号就跳过）
 
-在 GitHub 上新建仓库（例如 `tiktok-link-sync`），**不要**勾选 add README / .gitignore（本地已经有了）。
+1. 打开 <https://github.com/signup>
+2. 填邮箱（QQ 邮箱、Gmail 都行）→ 设置密码 → 起一个用户名（英文/数字，会被用在仓库地址里）
+3. 邮箱会收到验证码，填进去
+4. 通过人机验证（拼图 / 让图片转正之类）
+5. 注册完进入 <https://github.com> 能看见首页即可
 
-### 2. 推送代码
+> 免费账号就够，不用开通任何付费项。
+
+### 2. 生成一个部署令牌（Personal Access Token）
+
+1. 打开 <https://github.com/settings/tokens/new>
+2. **Note** 填 `tiktok-sync-deploy`
+3. **Expiration** 选 7 天或 30 天（部署完就能删掉）
+4. **Select scopes** 勾选两样：
+   - ☑ `repo`（整个大项，用来建仓库和推代码）
+   - ☑ `workflow`（必须！否则推 `.github/workflows/` 会被拒绝）
+5. 页面拉到最底 → **Generate token**
+6. 复制页面顶部那串 `ghp_` 开头的字符（**只显示这一次**，页面关了就再也看不到）
+
+### 3. 跑一键部署脚本
 
 在本项目目录（`tiktok-link-sync`）执行：
+
+```bash
+npm run deploy:github
+```
+
+脚本会问你两样东西（粘贴后回车，屏幕上不会显示字符）：
+
+| 提示 | 填什么 |
+|---|---|
+| 粘贴 App Secret | 第二节从飞书开放平台复制的 App Secret |
+| 粘贴 GitHub 令牌 | 上一步复制的 `ghp_` 开头的令牌 |
+
+App ID 和表格坐标**脚本会自己从本机配置里读**，不用你填。
+
+然后它会自动完成 7 件事：
+
+```
+[1/7] 环境自检        node / git / gh 工具是否就绪（gh 缺失会自动下载）
+[2/7] 收集凭证        App ID 自动读取，只问你 App Secret 和 GitHub 令牌
+[3/7] 飞书权限自检     换 tenant_access_token + 试读表格 —— 不通就先别往下走
+[4/7] 建仓库          创建公开仓库 tiktok-link-sync
+[5/7] 推送代码        直连失败会自动改走本机代理重试
+[6/7] 配 Secrets      写入 4 个密钥（本机回环代理不会写进云端）
+[7/7] 跑烟雾测试      触发 GitHub 上的第一轮真实抓取，并等出结果
+```
+
+脚本是**幂等**的：中途失败直接重跑，已完成的步骤会自动跳过。
+
+跑完后终端会打印「测试通过」或「测试未通过 + 原因」，也会给出仓库地址。
+
+### 4. 想手动做一遍（脚本用不了时的兜底）
+
+<details>
+<summary>点开看手动等价操作</summary>
+
+**建仓库**：在 <https://github.com/new> 建一个 **Public** 仓库，名字 `tiktok-link-sync`，**不要**勾选 add README / .gitignore。
+
+**推代码**：
 
 ```bash
 git remote add origin https://github.com/<你的用户名>/tiktok-link-sync.git
 git push -u origin main
 ```
 
-> 首次推送需要认证。用 GitHub 的 Personal Access Token 当密码，或配置 SSH 密钥。
-
-### 3. 配置 Secrets
-
-仓库页面 → **Settings → Secrets and variables → Actions → New repository secret**，逐个添加：
+**配 Secrets**：仓库页面 → **Settings → Secrets and variables → Actions → New repository secret**，逐个添加：
 
 | Secret 名称 | 值 | 必填 |
 |---|---|---|
@@ -88,6 +155,8 @@ git push -u origin main
 | `TIKTOK_PROXY` | 公网代理地址，如 `http://user:pass@1.2.3.4:8080` | 可选，见第四节 |
 
 > `TIKTOK_PROXY` 不填＝直连。你本机那个 `127.0.0.1:15236` **在云端用不了**（那是本机回环地址），要填必须是公网可达的代理。
+
+</details>
 
 ---
 
@@ -122,13 +191,17 @@ git push -u origin main
 |---|---|
 | 触发频率 | 每 30 分钟（`cron: '0,30 * * * *'`，GitHub 用 UTC，整半点对齐） |
 | 单次耗时 | 约 2 分钟（首次装浏览器 3~4 分钟，之后有缓存） |
-| 公开仓库 | 免费无时长限制 ✅ |
-| 私有仓库 | 约 2880 分钟/月 > 2000 分钟免费额度 ❌ |
+| **公开仓库（本方案）** | **免费且不限时长** ✅ |
+| 私有仓库（如果你改成 private） | 约 2880 分钟/月 > 2000 分钟免费额度 ❌ 需把频率放宽到每 1 小时 |
 
-**两个必须知道的坑：**
+> 本方案用公开仓库，所以**没有额度焦虑，也不用降低频率**。
+> 如果你出于隐私考虑想改成 private，请同时把 `tiktok-sync.yml` 里的 cron 改成
+> `0 * * * *`（每小时一次），这样约 720 次/月 × 2 分钟 ≈ 1440 分钟，仍在免费额度内。
+
+**还需要知道的：**
 
 1. **GitHub 会延迟**：定时任务在平台高峰期可能晚几分钟到十几分钟，甚至偶尔跳过。这是 GitHub 调度的固有行为，不是配置问题。
-2. **60 天无活动会自动停用定时任务**：如果这个仓库 60 天没有任何提交，GitHub 会停掉它的 schedule。建议偶尔（比如每月）往仓库提交一次，或去 Actions 页面手动 Run 一次。
+2. ~~60 天无活动会自动停用定时任务~~ —— **已经由 workflow 里的「保活提交」自动解决**：每月 1 号会自动往仓库提交一次 `.keepalive` 文件，保证仓库始终有活动，定时任务永不被停用，你不需要记着这件事。
 
 ---
 
@@ -167,11 +240,15 @@ npm run watch:start -- --stats-every 120
 
 | 现象 | 原因 / 处理 |
 |---|---|
-| `code=99991672 app_scope_not_applied` | 应用没开 `bitable:app` 权限，或**开了但没发布版本** |
+| 脚本报 `app secret invalid (code=10014)` | App Secret 复制错了（多半漏了尾部字符或带了空格），回开放平台重新复制 |
+| 脚本报「飞书鉴权失败」且提示权限 | 应用没开 `bitable:app` 权限，或**开了但没发布版本** |
+| `code=99991672 app_scope_not_applied` | 同上：权限没生效，去「版本管理与发布」创建版本并申请发布 |
 | `91403 Forbidden` / `code=1254303` | 应用没被加进这张多维表格的协作者 |
-| `tenant_access_token 获取失败` | App ID / Secret 填错，或 Secret 里有多余空格 |
-| 抓取返回 0 条 | TikTok 拦了 GitHub 的 IP，配 `TIKTOK_PROXY` |
-| 定时任务不跑 | ① 检查仓库是否被 GitHub 停用 schedule（60 天无活动）② workflow 文件是否在默认分支上 |
+| 脚本报「令牌无效或权限不足」 | 令牌没勾 `repo`，或者复制时漏了字符；重新生成一个 |
+| 推送代码被拒绝，提示 `workflow` scope | 令牌没勾 `workflow`，重新生成时补上 |
+| 直连推送超时 | 脚本会自动改走本机代理重试；仍失败就手动 `git push -u origin main` |
+| 抓取返回 0 条 | TikTok 拦了 GitHub 的 IP，配 `TIKTOK_PROXY`（见第四节） |
+| 定时任务不跑 | ① workflow 文件是否在默认分支上 ② Actions 页面是否显示被停用 |
 | 状态写入报错（单选字段） | 说明该字段在表里被改成了别的类型，找我看 `coerceForApi` 的类型映射 |
 | 想看历史运行结果 | 每次运行会上传 `data/feishu-run-*.csv` 审计快照，在 Actions 运行页面的 Artifacts 里下载，保留 7 天 |
 

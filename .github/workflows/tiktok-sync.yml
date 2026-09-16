@@ -10,6 +10,10 @@ on:
     # GitHub 的 cron 用 UTC。整半小时在任何时区都对齐，所以不用换算。
     # 注意：平台高峰期可能延迟几分钟到十几分钟，属正常现象。
     - cron: '0,30 * * * *'
+    # 每月 1 号 UTC 03:00 触发一次「保活提交」。
+    # 用途：GitHub 会在仓库连续 60 天无活动时自动停用 schedule，
+    # 这个每月提交保证仓库一直有活动，从而永不被停用。
+    - cron: '0 3 1 * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -23,6 +27,9 @@ on:
 concurrency:
   group: tiktok-sync
   cancel-in-progress: false
+
+permissions:
+  contents: write # 供「保活提交」步骤推送 .keepalive
 
 jobs:
   sync:
@@ -68,6 +75,22 @@ jobs:
           PW_VERSION=$(node -p "require('playwright-core/package.json').version")
           echo "playwright-core 版本: $PW_VERSION"
           npx --yes "playwright@$PW_VERSION" install --with-deps chromium
+
+      # ── 保活：每月 1 号提交一次，避免仓库 60 天无活动被 GitHub 停用 schedule ──
+      # 放在同步之前，这样即使本轮同步失败，保活也已完成。
+      - name: 保活提交
+        if: github.event.schedule == '0 3 1 * *'
+        run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .keepalive
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .keepalive
+          if git diff --cached --quiet; then
+            echo "无变化，跳过提交"
+            exit 0
+          fi
+          git commit -m "chore: 月度保活提交（防止定时任务被停用）"
+          git push || echo "推送失败（可能无写权限），不影响本轮同步"
 
       # ── 以下两步会写飞书表格 ────────────────────────────────
       # 用 config.ci.json（不含凭证），表格坐标与 app 凭证全部来自上面的 Secrets

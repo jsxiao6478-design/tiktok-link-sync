@@ -230,6 +230,9 @@ async function main() {
   let lockFd = null;
   const noLock = !!args['no-lock'];
   if (!noLock) {
+    // 云端 fresh checkout 上没有 data/ 目录（被 .gitignore 排除），
+    // 直接建锁文件会 ENOENT，先确保目录存在
+    fs.mkdirSync(path.join(ROOT, 'data'), { recursive: true });
     lockFd = acquireLock(lockFile);
     if (lockFd === null) return; // 已有活着的实例在跑
     sweepTemp(path.join(ROOT, 'data'));

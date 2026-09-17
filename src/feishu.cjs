@@ -204,6 +204,14 @@ function coerceForApi(value, type) {
     if (Array.isArray(value)) return value.map(String);
     return [String(value)];
   }
+  // URL 字段（type=15）写入要求 {link, text} 对象；传纯字符串会触发
+  // URLFieldConvFail（1254068），整批原子回滚把其它行也带挂。
+  if (type === 15) {
+    const s = String(value || '').trim();
+    if (!s) return null;
+    if (typeof value === 'object' && value.link) return value;
+    return { link: s, text: s };
+  }
   return value;
 }
 

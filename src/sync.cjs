@@ -635,8 +635,9 @@ async function runFeishu(args, config) {
     );
   }
 
+  let preserved = 0;
   pending.forEach((rec, i) => {
-    if (refreshStats) return; // 已在上面按视频 ID 处理完毕
+    if (refreshStats) return;
     const m = results[i];
     const fields = {};
 
@@ -645,6 +646,36 @@ async function runFeishu(args, config) {
     // 也不会清掉「同步触发」标记（保留它，下一轮会自动重试）。
     if (degradedAccounts.has(normalizeAccount(rec.account))) {
       log(`  ⏭ 跳过（@${normalizeAccount(rec.account)} 本轮抓取降级）：${String(rec.title).slice(0, 30)}`);
+      return;
+    }
+
+    const recLink = rec.link || '';
+    const hadValidLink = /\/video\//.test(recLink);
+    const reMatchFail = m.status === '未找到';
+
+    // ── 保护已有链接 ──
+    // 场景：用户点「立即同步」按钮 → 飞书把 TRIGGER 写到所有行 → 云端对所有行重跑匹配。
+    // 嵌入页只有「最新 10 条」硬上限：每账号每天 10+ 条，09-17 当天的 10 条
+    // 会把 09-14/15/16 的视频全部挤出窗口 → 历史「已补全」行的链接虽然有效，
+    // 但匹配逻辑找不到候选 → 误判为「未找到」。
+    // 修法：原链接仍有效 + 本轮重匹配失败 → 保留原状态，不写任何字段（除 TRIGGER 清掉）。
+    if (hadValidLink && reMatchFail) {
+      preserved++;
+      const wasTrigger = /^TRIGGER/i.test(rec.trigger || '');
+      if (wasTrigger) {
+        updates.push({ recordId: rec.recordId, fields: { [FC.trigger]: '' } });
+      }
+      auditRows.push({
+        [FC.account]: rec.account,
+        [FC.title]: rec.title,
+        [FC.date]: rec.date,
+        [FC.link]: recLink,
+        匹配标题: '',
+        置信度: '',
+        状态: rec.status || '(保留)',
+        提示: '重匹配失败，原链接保留',
+      });
+      log(`  ⏭ 保留原状态（链接有效，重匹配窗口外）：${String(rec.title).slice(0, 30)}`);
       return;
     }
 
@@ -733,6 +764,7 @@ async function runFeishu(args, config) {
     log(`✓ 已补全 ${ok} 条`);
     log(`⚠ 需人工确认 ${review} 条`);
     log(`✗ 未找到 ${fail} 条`);
+    if (preserved) log(`⏭ 保留原状态 ${preserved} 条（链接有效，本轮重匹配窗口外）`);
   }
   log(`本地审计快照: ${auditPath}`);
   log(`原始抓取缓存: ${cacheDir}`);

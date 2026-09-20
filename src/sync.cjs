@@ -266,6 +266,35 @@ async function main() {
 
 /* ───────────────────────── 通用: 抓取 ───────────────────────── */
 
+/** 读磁盘缓存里的 videos（缺失 / 损坏返回空数组） */
+function readCacheVideos(cacheFile) {
+  try {
+    return JSON.parse(fs.readFileSync(cacheFile, 'utf8')).videos || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 合并「本轮抓取结果」与「磁盘历史缓存」，按视频 ID 去重（本轮优先）。
+ *
+ * 为什么必须合并：TikTok 嵌入页（HTTP 通道）硬上限只有「最新 10 条」，
+ * 浏览器通道在风控下也常只返回 10 条。若匹配池只用本轮结果，
+ * 历史日期（如 3 天前）的行会因视频被挤出窗口而误判「未找到」，
+ * 而磁盘缓存是过去多轮累积的（含滚动加载拿到的历史视频），能补上窗口外的部分。
+ */
+function mergeVideos(fresh, cached) {
+  const seen = new Set();
+  const out = [];
+  for (const v of [...(fresh || []), ...(cached || [])]) {
+    const id = String(v && v.id ? v.id : '');
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(v);
+  }
+  return out;
+}
+
 /**
  * 按账号抓取视频；命中缓存则直接读。
  * @returns {Promise<object>} { videosByAccount, cacheDir }
@@ -322,15 +351,21 @@ async function crawlAccounts(accounts, config, args) {
             log('    ✗ 重试仍为 0 条');
           }
         }
-        videosByAccount[acc] = videos;
-        if (!videos.length) degradedAccounts.add(acc); // 抓不到 = 没有信息，别拿它去改表
+        // ── 匹配池 = 本轮抓取结果 ∪ 磁盘历史缓存 ──
+        // 只用本轮结果会导致「窗口外」的历史行永远匹配不上（详见 mergeVideos 注释）。
+        const cachedVideos = readCacheVideos(cacheFile);
+        videosByAccount[acc] = mergeVideos(videos, cachedVideos);
+        const mergedCount = videosByAccount[acc].length;
+
+        // 两个来源都没数据才算降级（没信息 → 别拿它去改表）
+        if (!mergedCount) degradedAccounts.add(acc);
+        if (cachedVideos.length && mergedCount > videos.length) {
+          log(`    ↳ 叠加历史缓存 ${cachedVideos.length} 条 → 匹配池 ${mergedCount} 条`);
+        }
 
         // 缓存只在「抓到了、且不比上一份少」时覆盖：
         // TikTok 限流/降级时可能返回 0~个位数条，若直接覆盖会把可用的旧缓存冲掉。
-        let prevCount = 0;
-        try {
-          prevCount = (JSON.parse(fs.readFileSync(cacheFile, 'utf8')).videos || []).length;
-        } catch (_) { /* ignore */ }
+        const prevCount = cachedVideos.length;
         if (videos.length > 0 && !degraded && videos.length >= prevCount) {
           fs.writeFileSync(
             cacheFile,
@@ -532,8 +567,10 @@ async function runFeishu(args, config) {
     // 终态：已补全 / 需人工确认（带链接）默认不重跑，避免半小时一次的死循环
     if (r.status === '已补全') return false;
     if (r.status === '需人工确认') return false;
-    // 未找到 默认视为终态；加 --retry 才重新尝试（适合视频索引延迟的情况）
-    if (r.status === '未找到' && !retry) return false;
+    // 「未找到」不再当终态跳过：嵌入页窗口只有最新 10 条、浏览器通道也可能只返回
+    // 10 条，历史行很容易被误判为未找到。账号级抓取本来每轮都要做，重试的边际
+    // 成本接近 0，配合 mergeVideos 的历史缓存叠加，能自动把误判的行补回来。
+    // （--retry 参数保留兼容，现在恒为可重试）
     return true;
   });
 
@@ -681,7 +718,12 @@ async function runFeishu(args, config) {
 
     const keep = linkTrustworthy(m.status);
 
-    if (keep && m.link) fields[FC.link] = m.link;
+    if (keep && m.link) {
+      fields[FC.link] = m.link;
+      // 注：原先这里会顺带写「视频文件名」列，但该列已从表格删除。
+      // 飞书字段一旦不存在，写入会抛 1254045 FieldNameNotFound 并整批回滚，
+      // 所以这里不再写任何额外字段。
+    }
     fields[FC.status] = [mapStatus(m.status)];
     if (m.matchedTitle) fields[FC.matchedTitle] = m.matchedTitle;
 

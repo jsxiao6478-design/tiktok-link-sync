@@ -382,10 +382,35 @@ function writeJsonTemp(cwd, payload) {
  */
 async function updateRecords(config, updates, cwd, opts) {
   const f = feishuConfig(config);
-  const list = (updates || []).filter((u) => u && u.recordId);
+  let list = (updates || []).filter((u) => u && u.recordId);
   if (list.length === 0) return 0;
   const useApi = backendName(config) === 'openapi';
   const types = useApi ? await fieldTypes(config, f) : null;
+
+  // ── 防御：以线上字段清单为准，丢弃表格里不存在的字段 ──
+  // 飞书 batch_update 是「原子」的：只要有一条记录引用了不存在的字段名，
+  // 整批（最多 50 条）会一起回滚并抛 1254045 FieldNameNotFound。
+  // 典型诱因：配置里还留着已从表格删掉（或改了名）的列 —— 比如「视频文件名」。
+  // 那种情况下同步会「看起来跑了、日志也没报错」，实际一条都没写进去，很难排查。
+  // 所以这里不再盲信配置，先按线上实际字段过滤，并把丢弃的字段名显式打出来。
+  if (types) {
+    const unknown = new Set();
+    for (const u of list) {
+      for (const name of Object.keys(u.fields || {})) {
+        if (name && !Object.prototype.hasOwnProperty.call(types, name)) {
+          unknown.add(name);
+          delete u.fields[name];
+        }
+      }
+    }
+    if (unknown.size) {
+      console.warn(`⚠ 表格中不存在这些字段，已跳过（否则整批会被飞书回滚）：${[...unknown].join('、')}`);
+    }
+    // 字段全被丢光的记录没有写入意义（飞书也不接受空 fields）
+    list = list.filter((u) => Object.keys(u.fields || {}).length > 0);
+    if (list.length === 0) return 0;
+  }
+
   let written = 0;
   for (let i = 0; i < list.length; i += MAX_BATCH) {
     const chunk = list.slice(i, i + MAX_BATCH);

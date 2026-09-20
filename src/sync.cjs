@@ -363,19 +363,26 @@ async function crawlAccounts(accounts, config, args) {
           log(`    ↳ 叠加历史缓存 ${cachedVideos.length} 条 → 匹配池 ${mergedCount} 条`);
         }
 
-        // 缓存只在「抓到了、且不比上一份少」时覆盖：
-        // TikTok 限流/降级时可能返回 0~个位数条，若直接覆盖会把可用的旧缓存冲掉。
-        const prevCount = cachedVideos.length;
-        if (videos.length > 0 && !degraded && videos.length >= prevCount) {
-          fs.writeFileSync(
-            cacheFile,
-            JSON.stringify({ username: acc, fetchedAt: new Date().toISOString(), videos }, null, 2),
-            'utf8'
-          );
-          log(`    → 获得 ${videos.length} 条视频（已更新缓存）`);
+        // 缓存写入 = 并集（本轮抓到的合进旧缓存，按视频 ID 去重、本轮优先）。
+        // 旧逻辑是「不比上一份少才整份覆盖」：浏览器通道一次能抓几十条没问题，
+        // 但 HTTP 通道只有最新 ~10 条 —— 缓存一旦超过 10 条就永远不再更新、
+        // 永远长不大。并集写法保证缓存单调增长，跨轮次累积历史；
+        // 限流返回 0 条时并集 = 旧缓存原样，天然不会被冲掉。
+        if (videos.length > 0 && !degraded) {
+          const mergedForCache = mergeVideos(videos, cachedVideos);
+          if (mergedForCache.length > cachedVideos.length) {
+            fs.writeFileSync(
+              cacheFile,
+              JSON.stringify({ username: acc, fetchedAt: new Date().toISOString(), videos: mergedForCache }, null, 2),
+              'utf8'
+            );
+            log(`    → 获得 ${videos.length} 条视频，缓存 ${cachedVideos.length} → ${mergedForCache.length} 条`);
+          } else {
+            log(`    → 获得 ${videos.length} 条视频，缓存无新增（${cachedVideos.length} 条）`);
+          }
         } else {
           log(
-            `    → 获得 ${videos.length} 条视频，保留旧缓存 ${prevCount} 条不覆盖` +
+            `    → 获得 ${videos.length} 条视频，保留旧缓存 ${cachedVideos.length} 条不覆盖` +
               (degraded ? ' ⚠降级(可能是风控/无公开视频)' : '')
           );
         }

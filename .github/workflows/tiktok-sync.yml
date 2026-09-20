@@ -125,6 +125,25 @@ jobs:
         if: github.event_name == 'schedule' || github.event.inputs.mode == 'sync'
         run: node src/sync.cjs --source feishu --config config.ci.json --refresh-stats
 
+      # ── 回写抓取缓存：让「历史视频池」跨轮次累积 ──────────────
+      # Actions 每轮都是全新环境，不回写的话匹配池永远只有最新 ~10 条，
+      # 隔了几天的老行就永远补不上（嵌入页窗口只有 10 条的硬上限）。
+      # 缓存进仓库后，下一轮 checkout 自带全部历史，老行也能自动匹配。
+      # 写入是并集合并（按视频 ID 去重），单轮推送失败也只是丢一次增量，
+      # 下一轮会重新并进去，所以这里失败不影响正确性。
+      - name: 回写抓取缓存
+        if: always() && (github.event_name == 'schedule' || github.event.inputs.mode == 'sync')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/cache
+          if git diff --cached --quiet; then
+            echo "缓存无变化，跳过提交"
+            exit 0
+          fi
+          git commit -m "chore: 更新抓取缓存 $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push || echo "推送失败（可能撞上其它提交），本轮增量下轮会重新并入"
+
       - name: 保留运行日志
         if: always()
         uses: actions/upload-artifact@v4

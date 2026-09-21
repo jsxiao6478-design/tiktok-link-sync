@@ -130,10 +130,16 @@ jobs:
       # 隔了几天的老行就永远补不上（嵌入页窗口只有 10 条的硬上限）。
       # 缓存进仓库后，下一轮 checkout 自带全部历史，老行也能自动匹配。
       # 写入是并集合并（按视频 ID 去重），单轮推送失败也只是丢一次增量，
-      # 下一轮会重新并进去，所以这里失败不影响正确性。
+      # 下一轮会重新并进去。
+      #
+      # 2026-09-21 之前这里用 `git push || echo "推送失败"` 让 push 失败被吞掉，
+      # 导致 cache 从未回写成功，云端累积断掉，错配也修不了。改为：
+      #   1) push 失败 → git pull --rebase 一次再 push（处理并发撞 commit 的情况）
+      #   2) 最终 push 仍失败 → exit 1 让 workflow 失败（而不是「成功」骗过去）
       - name: 回写抓取缓存
         if: always() && (github.event_name == 'schedule' || github.event.inputs.mode == 'sync')
         run: |
+          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/cache
@@ -142,7 +148,12 @@ jobs:
             exit 0
           fi
           git commit -m "chore: 更新抓取缓存 $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push || echo "推送失败（可能撞上其它提交），本轮增量下轮会重新并入"
+          # 一次 push 撞到其它 commit 时，pull --rebase 后再 push
+          if ! git push origin HEAD:main; then
+            echo "首次 push 失败，尝试 rebase 后再 push"
+            git pull --rebase --autostash origin main || true
+            git push origin HEAD:main
+          fi
 
       - name: 保留运行日志
         if: always()

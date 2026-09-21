@@ -123,14 +123,35 @@ async function updateRef(newSha) {
 function b64(s) { return Buffer.from(s, 'utf8').toString('base64'); }
 
 (async () => {
-  // 用 git 拿到需要推送的 commit 列表（按时间正序：父 → 子）
-  const range = `${await fetchRemoteSha()}..HEAD`;
+  // 待推送 commits：从 HEAD 回溯到与远端 SHA 的 merge-base 之上的部分
+  const remoteSha = await fetchRemoteSha();
+  const localHead = run('git rev-parse HEAD');
+  let mergeBase = '';
+  try {
+    mergeBase = run(`git merge-base ${remoteSha} ${localHead}`);
+  } catch {
+    mergeBase = '';
+  }
+  let range;
+  if (mergeBase && mergeBase === remoteSha) {
+    // 远端是本地的祖先，正常情况：从 merge-base 到 HEAD
+    range = `${mergeBase}..HEAD`;
+  } else {
+    // 远端领先（之前用 REST API 推送过，SHA 与本地不一致）：
+    // 只推送 HEAD 这一个 commit，parent 设成远端 SHA
+    range = `${localHead}^..HEAD`;
+  }
   const commits = run(`git rev-list --reverse ${range}`).split('\n').filter(Boolean);
+  console.log('远端 main:', remoteSha);
+  console.log('本地 HEAD:', localHead);
+  console.log('merge-base:', mergeBase || '(无 — 远端领先)');
   console.log('待推送 commits:', commits.length);
   for (const c of commits) console.log('  ', run(`git log -1 --pretty=format:"%h %s" ${c}`));
 
-  let parent = await fetchRemoteSha();
-  console.log('远端 base:', parent);
+  // 起点 parent = 远端 SHA（如果本地领先于远端） 或 merge-base（如果远端领先）
+  const startParent = mergeBase && mergeBase !== remoteSha ? mergeBase : remoteSha;
+  let parent = startParent;
+  console.log('起点 parent:', parent);
 
   // 获取 base tree SHA
   const baseCommitUrl = `${BASE}/repos/${OWNER}/${REPO}/git/commits/${parent}`;

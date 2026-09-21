@@ -1,11 +1,11 @@
 {
   "username": "sonrisaglowmx",
-  "fetchedAt": "2026-09-21T07:37:15.437Z",
+  "fetchedAt": "2026-09-21T08:17:41.215Z",
   "videos": [
     {
       "id": "7687887881330789639",
       "title": "Mi sonrisa se ve más natural desde que uso esta pasta#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975881",
+      "createTime": 1789975881,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:31:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887881330789639",
@@ -16,7 +16,7 @@
     {
       "id": "7687887901006368021",
       "title": "Desde que probé esta pasta, mis dientes se ven más vivos#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975881",
+      "createTime": 1789975881,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:31:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887901006368021",
@@ -27,7 +27,7 @@
     {
       "id": "7687887898301058324",
       "title": "Una pasta distinta se volvió mi mejor hábito diario#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975880",
+      "createTime": 1789975880,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:31:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887898301058324",
@@ -38,7 +38,7 @@
     {
       "id": "7687887867422592276",
       "title": "Mi sonrisa se ve más clara y no cambié nada en mi rutina#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975880",
+      "createTime": 1789975880,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:31:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887867422592276",
@@ -49,7 +49,7 @@
     {
       "id": "7687887950280953109",
       "title": "Mis dientes se ven más brillantes y no hice nada complicado#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975880",
+      "createTime": 1789975880,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:31:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887950280953109",
@@ -60,7 +60,7 @@
     {
       "id": "7687887879338528021",
       "title": "Mi sonrisa se ve diferente y todo gracias a algo tan simple#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975880",
+      "createTime": 1789975880,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:31:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887879338528021",
@@ -71,18 +71,18 @@
     {
       "id": "7687887667769412885",
       "title": "Una pasta nueva cambió por completo mi forma de sonreír#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975820",
+      "createTime": 1789975820,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:30:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887667769412885",
-      "plays": 0,
+      "plays": 1,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
     {
       "id": "7687887663243873543",
       "title": "Mi sonrisa se ve mejor y nadie sabe el porqué#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975820",
+      "createTime": 1789975820,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:30:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887663243873543",
@@ -93,7 +93,7 @@
     {
       "id": "7687887640149937429",
       "title": "Mi pasta diaria se volvió la razón por la que sonrío más#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975820",
+      "createTime": 1789975820,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:30:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887640149937429",
@@ -104,7 +104,7 @@
     {
       "id": "7687887599788166421",
       "title": "No esperaba que algo tan básico me diera tanta seguridad#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
-      "createTime": "1789975820",
+      "createTime": 1789975820,
       "createDate": "2026-09-21",
       "createIso": "2026-09-21T07:30:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887599788166421",
@@ -113,53 +113,86 @@
       "author": "sonrisaglowmx"
     },
     {
+      "id": "7687887632440872200",
+      "title": "No hay nada complicado, solo constancia y mi pasta de siempre#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
+      "createTime": 1789975820,
+      "createDate": "2026-09-21",
+      "createIso": "2026-09-21T07:30:20.000Z",
+      "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887632440872200",
+      "plays": 1,
+      "likes": 0,
+      "author": "sonrisaglowmx"
+    },
+    {
+      "id": "7687887755778510100",
+      "title": "La uso cada día y el resultado se nota sin esfuerzo#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
+      "createTime": 1789975820,
+      "createDate": "2026-09-21",
+      "createIso": "2026-09-21T07:30:20.000Z",
+      "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687887755778510100",
+      "plays": 0,
+      "likes": 0,
+      "author": "sonrisaglowmx"
+    },
+    {
+      "id": "7687886629003922709",
+      "title": "No sabía que mi sonrisa podía verse así hasta que cambié de pasta#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260921",
+      "createTime": 1789975580,
+      "createDate": "2026-09-21",
+      "createIso": "2026-09-21T07:26:20.000Z",
+      "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687886629003922709",
+      "plays": 2,
+      "likes": 0,
+      "author": "sonrisaglowmx"
+    },
+    {
       "id": "7687513987952528641",
       "title": "Desde que probé esta pasta, mis dientes se ven más limpios#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789888821",
+      "createTime": 1789888821,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:20:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687513987952528641",
-      "plays": 0,
+      "plays": 2,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
     {
       "id": "7687514014548610312",
       "title": "Mi sonrisa se ve más clara y no tuve que cambiar mi rutina#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789888821",
+      "createTime": 1789888821,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:20:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687514014548610312",
-      "plays": 0,
+      "plays": 1,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
     {
       "id": "7687514003995741461",
       "title": "Una pasta simple se volvió mi mejor aliada para sonreír#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789888820",
+      "createTime": 1789888820,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:20:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687514003995741461",
-      "plays": 0,
+      "plays": 1,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
     {
       "id": "7687513502583475474",
       "title": "No esperaba que una pasta me diera tanta confianza al sonreír#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789888700",
+      "createTime": 1789888700,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:18:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687513502583475474",
-      "plays": 0,
+      "plays": 1,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
     {
       "id": "7687513020263615765",
       "title": "La uso mañana y noche y el resultado se nota solo#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789888521",
+      "createTime": 1789888521,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:15:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687513020263615765",
@@ -170,7 +203,7 @@
     {
       "id": "7687512272062663956",
       "title": "Mi sonrisa se ve más natural desde que cambié mi pasta de siempre#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789888401",
+      "createTime": 1789888401,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:13:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687512272062663956",
@@ -181,44 +214,66 @@
     {
       "id": "7687511496246496532",
       "title": "Mis dientes se ven más brillantes sin hacer nada fuera de lo normal#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789888221",
+      "createTime": 1789888221,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:10:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687511496246496532",
-      "plays": 0,
+      "plays": 20,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
     {
       "id": "7687511466634677524",
       "title": "Una pasta diferente fue todo lo que necesité para notar el cambio#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789888221",
+      "createTime": 1789888221,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:10:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687511466634677524",
-      "plays": 2,
+      "plays": 21,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
     {
       "id": "7687510887640386817",
       "title": "Mi sonrisa se volvió mi parte favorita y todo empezó con mi pasta#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789888100",
+      "createTime": 1789888100,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:08:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687510887640386817",
-      "plays": 1,
-      "likes": 0,
+      "plays": 22,
+      "likes": 2,
       "author": "sonrisaglowmx"
     },
     {
       "id": "7687510345920810247",
       "title": "Desde que uso esta pasta, mi sonrisa se ve más limpia y clara#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
-      "createTime": "1789887920",
+      "createTime": 1789887920,
       "createDate": "2026-09-20",
       "createIso": "2026-09-20T07:05:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687510345920810247",
+      "plays": 27,
+      "likes": 0,
+      "author": "sonrisaglowmx"
+    },
+    {
+      "id": "7687509742658538773",
+      "title": "No cambié nada más y mis dientes se ven completamente diferentes#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
+      "createTime": 1789887800,
+      "createDate": "2026-09-20",
+      "createIso": "2026-09-20T07:03:20.000Z",
+      "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687509742658538773",
       "plays": 0,
+      "likes": 0,
+      "author": "sonrisaglowmx"
+    },
+    {
+      "id": "7687509413183278357",
+      "title": "Mi pasta nueva está haciendo más de lo que esperaba por mi sonrisa#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 260920",
+      "createTime": 1789887621,
+      "createDate": "2026-09-20",
+      "createIso": "2026-09-20T07:00:21.000Z",
+      "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687509413183278357",
+      "plays": 28,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
@@ -251,8 +306,8 @@
       "createDate": "2026-09-19",
       "createIso": "2026-09-19T06:23:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687128236173610260",
-      "plays": 26,
-      "likes": 0,
+      "plays": 138,
+      "likes": 1,
       "author": "sonrisaglowmx"
     },
     {
@@ -262,7 +317,7 @@
       "createDate": "2026-09-19",
       "createIso": "2026-09-19T06:23:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687128569654430997",
-      "plays": 30,
+      "plays": 31,
       "likes": 1,
       "author": "sonrisaglowmx"
     },
@@ -284,7 +339,7 @@
       "createDate": "2026-09-19",
       "createIso": "2026-09-19T06:23:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687127934196387089",
-      "plays": 972,
+      "plays": 1297,
       "likes": 8,
       "author": "sonrisaglowmx"
     },
@@ -295,8 +350,8 @@
       "createDate": "2026-09-19",
       "createIso": "2026-09-19T06:23:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7687128227445280021",
-      "plays": 24,
-      "likes": 1,
+      "plays": 775,
+      "likes": 2,
       "author": "sonrisaglowmx"
     },
     {
@@ -339,7 +394,7 @@
       "createDate": "2026-09-18",
       "createIso": "2026-09-18T04:33:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7686728829703900423",
-      "plays": 138,
+      "plays": 152,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
@@ -383,7 +438,7 @@
       "createDate": "2026-09-18",
       "createIso": "2026-09-18T04:31:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7686728379860585748",
-      "plays": 295,
+      "plays": 433,
       "likes": 2,
       "author": "sonrisaglowmx"
     },
@@ -394,7 +449,7 @@
       "createDate": "2026-09-18",
       "createIso": "2026-09-18T04:31:21.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7686728440342416658",
-      "plays": 157,
+      "plays": 174,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
@@ -427,7 +482,7 @@
       "createDate": "2026-09-18",
       "createIso": "2026-09-18T04:31:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7686728302702136597",
-      "plays": 229,
+      "plays": 239,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
@@ -438,8 +493,8 @@
       "createDate": "2026-09-18",
       "createIso": "2026-09-18T04:31:20.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7686728105460911377",
-      "plays": 111,
-      "likes": 0,
+      "plays": 223,
+      "likes": 1,
       "author": "sonrisaglowmx"
     },
     {
@@ -471,7 +526,7 @@
       "createDate": "2026-09-17",
       "createIso": "2026-09-17T07:46:32.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7686407411170577684",
-      "plays": 176,
+      "plays": 615,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
@@ -493,7 +548,7 @@
       "createDate": "2026-09-17",
       "createIso": "2026-09-17T07:44:41.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7686406913633963284",
-      "plays": 35,
+      "plays": 44,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
@@ -669,7 +724,7 @@
       "createDate": "2026-09-16",
       "createIso": "2026-09-16T06:29:01.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7686016334664125717",
-      "plays": 392,
+      "plays": 393,
       "likes": 2,
       "author": "sonrisaglowmx"
     },
@@ -691,7 +746,7 @@
       "createDate": "2026-09-16",
       "createIso": "2026-09-16T06:25:33.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7686015466237594900",
-      "plays": 2365,
+      "plays": 2382,
       "likes": 9,
       "author": "sonrisaglowmx"
     },

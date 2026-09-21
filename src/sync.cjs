@@ -215,9 +215,24 @@ function mapStatus(status) {
   return '需人工确认'; // 待复核 / 低置信 / 日期兜底(请确认)
 }
 
-/** 该匹配结果是否足够可信, 可以直接把链接写进表里 */
+/** 该匹配结果是否足够可信, 可以直接把链接写进表里
+ *
+ * 阈值与评分规则（src/matcher.cjs）：
+ *   score = 0.72 * titleSimilarity + 0.28 * dateScore
+ *   status: 已匹配 ≥ 0.85 ｜ 待复核 0.65~0.85 ｜ 低置信 < 0.65
+ *
+ * 写入策略：
+ *   - 已匹配 → 直接写 link（充分可信）
+ *   - 待复核 → **不写 link**。边界匹配在这种「短标题 + 模式重复」场景里
+ *     容易把 A 行的链接写到 B 行（实测：carlosmendoz89 一天发 12 条牙齿贴，
+ *     标题差异极小，0.65~0.85 的边界匹配几乎 100% 错配）。宁可让用户看
+ *     「需人工确认（无链接）+ hint 里给候选链接」，也不要把错链接写进表。
+ *   - 日期兜底(请确认) → 仅当「该账号当天唯一一条」+ 标题相似度≥0.2 才算；
+ *     这种是「唯一候选且不算完全无关」，可信，写入。
+ *   - 低置信 / 未找到 → 不写 link（之前会有 link 残留问题，已修）。
+ */
 function linkTrustworthy(status) {
-  return status === '已匹配' || status === '待复核' || status === '日期兜底(请确认)';
+  return status === '已匹配' || status === '日期兜底(请确认)';
 }
 
 async function main() {
@@ -732,6 +747,14 @@ async function runFeishu(args, config) {
       // 注：原先这里会顺带写「视频文件名」列，但该列已从表格删除。
       // 飞书字段一旦不存在，写入会抛 1254045 FieldNameNotFound 并整批回滚，
       // 所以这里不再写任何额外字段。
+    } else if (hadValidLink && !keep) {
+      // ── 清空残留的错配 link ──
+      // 场景：上一次 sync 写过 link（高置信），这次重匹配变成低置信/未找到。
+      // 旧代码只「不更新 link」，导致表中残留一个错链接 + 状态显示矛盾的组合
+      // （link 是 A 视频，但匹配标题/confidence 说的是 B 视频）。
+      // 修法：低置信时主动把 link 清空，状态变「未找到」或「需人工确认（无链接）」，
+      // 让下轮 sync（缓存增长后）有机会重新匹配到真视频；候选链接仍写在 hint 里供人工参考。
+      fields[FC.link] = '';
     }
     fields[FC.status] = [mapStatus(m.status)];
     if (m.matchedTitle) fields[FC.matchedTitle] = m.matchedTitle;

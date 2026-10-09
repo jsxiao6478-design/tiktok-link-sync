@@ -1,6 +1,6 @@
 {
   "username": "sonrisaglowmx",
-  "fetchedAt": "2026-10-09T02:05:16.104Z",
+  "fetchedAt": "2026-10-09T05:04:49.243Z",
   "videos": [
     {
       "id": "7686018902601583893",
@@ -20,18 +20,7 @@
       "createDate": "2026-10-09",
       "createIso": "2026-10-09T01:43:02.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7694477608293010708",
-      "plays": 0,
-      "likes": 0,
-      "author": "sonrisaglowmx"
-    },
-    {
-      "id": "7694477178326519061",
-      "title": "",
-      "createTime": "1791510085",
-      "createDate": "2026-10-09",
-      "createIso": "2026-10-09T01:41:25.000Z",
-      "url": "https://www.tiktok.com/@sonrisaglowmx/video/7694477178326519061",
-      "plays": 3,
+      "plays": 28,
       "likes": 0,
       "author": "sonrisaglowmx"
     },
@@ -64,6 +53,17 @@
       "createDate": "2026-10-09",
       "createIso": "2026-10-09T01:36:48.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7694475995348290836",
+      "plays": 38,
+      "likes": 0,
+      "author": "sonrisaglowmx"
+    },
+    {
+      "id": "7694475837093039412",
+      "title": "Usarla se siente como un pequeño lujo#blanqueamientodental#dientesamarillos#dientes#dentalcare#drbiocare 261009",
+      "createTime": "1791509768",
+      "createDate": "2026-10-09",
+      "createIso": "2026-10-09T01:36:08.000Z",
+      "url": "https://www.tiktok.com/@sonrisaglowmx/video/7694475837093039412",
       "plays": 0,
       "likes": 0,
       "author": "sonrisaglowmx"
@@ -97,8 +97,8 @@
       "createDate": "2026-10-09",
       "createIso": "2026-10-09T01:34:28.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7694475386335333652",
-      "plays": 3,
-      "likes": 0,
+      "plays": 2242,
+      "likes": 23,
       "author": "sonrisaglowmx"
     },
     {
@@ -108,8 +108,8 @@
       "createDate": "2026-10-09",
       "createIso": "2026-10-09T01:30:52.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7694474461503868180",
-      "plays": 3,
-      "likes": 0,
+      "plays": 39,
+      "likes": 1,
       "author": "sonrisaglowmx"
     },
     {
@@ -119,6 +119,17 @@
       "createDate": "2026-10-09",
       "createIso": "2026-10-09T01:30:36.000Z",
       "url": "https://www.tiktok.com/@sonrisaglowmx/video/7694474364317748500",
+      "plays": 30,
+      "likes": 0,
+      "author": "sonrisaglowmx"
+    },
+    {
+      "id": "7694477178326519061",
+      "title": "",
+      "createTime": "1791510085",
+      "createDate": "2026-10-09",
+      "createIso": "2026-10-09T01:41:25.000Z",
+      "url": "https://www.tiktok.com/@sonrisaglowmx/video/7694477178326519061",
       "plays": 3,
       "likes": 0,
       "author": "sonrisaglowmx"
